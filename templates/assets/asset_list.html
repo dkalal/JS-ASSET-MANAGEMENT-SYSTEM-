@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Asset List{% endblock %}
+{% block content %}
+<h2 class="mb-4">All Assets</h2>
+<table class="table table-hover table-bordered glass">
+    <thead class="table-light">
+        <tr>
+            <th>ID</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Assigned To</th>
+            <th>Created</th>
+            <th>QR</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for asset in assets %}
+        <tr>
+            <td>{{ asset.pk }}</td>
+            <td>{{ asset.category }}</td>
+            <td>{{ asset.status }}</td>
+            <td>{{ asset.assigned_to }}</td>
+            <td>{{ asset.created_at|date:'Y-m-d H:i' }}</td>
+            <td>{% if asset.qr_code %}<img src="{{ asset.qr_code.url }}" alt="QR" style="height:40px;">{% endif %}</td>
+            <td><a href="{% url 'asset_detail' asset.pk %}" class="btn btn-sm btn-outline-primary">View</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center">No assets found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="{% url 'asset_register' %}" class="btn btn-primary">Register New Asset</a>
+{% endblock %} 

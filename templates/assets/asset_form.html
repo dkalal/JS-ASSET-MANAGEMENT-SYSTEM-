@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Register Asset{% endblock %}
+{% block content %}
+<h2 class="mb-4">Register New Asset</h2>
+<form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label for="id_category" class="form-label">Category <span class="text-danger">*</span></label>
+            {{ form.category }}
+            {{ form.category.errors }}
+        </div>
+        <div class="col-md-6">
+            <label for="id_status" class="form-label">Status <span class="text-danger">*</span></label>
+            {{ form.status }}
+            {{ form.status.errors }}
+        </div>
+        <!-- Dynamic fields placeholder -->
+        <div class="col-12" id="dynamic-fields">
+            <!-- Dynamic fields will be rendered here via JS/AJAX based on category -->
+        </div>
+        <div class="col-12">
+            <label for="id_description" class="form-label">Description</label>
+            {{ form.description }}
+            {{ form.description.errors }}
+        </div>
+        <div class="col-md-6">
+            <label for="id_assigned_to" class="form-label">Assigned To</label>
+            {{ form.assigned_to }}
+            {{ form.assigned_to.errors }}
+        </div>
+        <div class="col-md-6">
+            <label for="id_images" class="form-label">Image (max 2MB)</label>
+            {{ form.images }}
+            {{ form.images.errors }}
+            <img id="image-preview" src="#" alt="Image Preview" class="img-fluid mt-2 d-none" style="max-width:150px;"/>
+        </div>
+        <div class="col-md-6">
+            <label for="id_documents" class="form-label">Document (PDF/Word, max 5MB)</label>
+            {{ form.documents }}
+            {{ form.documents.errors }}
+        </div>
+    </div>
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary">Register Asset</button>
+    </div>
+</form>
+{% if object and object.qr_code %}
+<div class="mt-4 text-center">
+    <h5>Asset QR Code</h5>
+    <img src="{{ object.qr_code.url }}" alt="Asset QR Code" class="img-fluid" style="max-width:200px;">
+    <div class="mt-2">
+        <a href="{{ object.qr_code.url }}" download class="btn btn-outline-secondary btn-sm">Download QR</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block extra_scripts %}
+<script>
+// Image preview logic
+const imageInput = document.getElementById('id_images');
+const preview = document.getElementById('image-preview');
+if (imageInput) {
+    imageInput.addEventListener('change', function(e) {
+        const [file] = imageInput.files;
+        if (file) {
+            preview.src = URL.createObjectURL(file);
+            preview.classList.remove('d-none');
+        } else {
+            preview.classList.add('d-none');
+        }
+    });
+}
+</script>
+{% endblock %} 
