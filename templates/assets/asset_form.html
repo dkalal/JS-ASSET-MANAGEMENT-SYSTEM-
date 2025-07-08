@@ -18,8 +18,13 @@
         </div>
         <!-- Dynamic fields placeholder -->
         <div class="col-12" id="dynamic-fields">
-            <!-- Dynamic fields will be rendered here via JS/AJAX based on category -->
+            <table class="table table-bordered table-sm align-middle" id="dynamic-fields-table" style="background:rgba(255,255,255,0.7);">
+                <tbody>
+                <!-- Dynamic fields will be rendered here via JS/AJAX based on category -->
+                </tbody>
+            </table>
         </div>
+        <input type="hidden" name="dynamic_data" id="id_dynamic_data">
         <div class="col-12">
             <label for="id_description" class="form-label">Description</label>
             {{ form.description }}
@@ -70,6 +75,65 @@ if (imageInput) {
         } else {
             preview.classList.add('d-none');
         }
+    });
+}
+
+// Dynamic fields logic
+const categoryInput = document.getElementById('id_category');
+const dynamicFieldsDiv = document.getElementById('dynamic-fields');
+const dynamicDataInput = document.getElementById('id_dynamic_data');
+
+function renderDynamicFields(fields, values = {}) {
+    const tableBody = document.querySelector('#dynamic-fields-table tbody');
+    tableBody.innerHTML = '';
+    for (const [key, field] of Object.entries(fields)) {
+        let value = values[key] || '';
+        let required = field.required ? 'required' : '';
+        let label = field.label || key;
+        let inputHtml = '';
+        if (field.type === 'text') {
+            inputHtml = `<input type='text' class='form-control' name='dyn_${key}' id='id_dyn_${key}' value='${value}' ${required}>`;
+        } else if (field.type === 'number') {
+            inputHtml = `<input type='number' class='form-control' name='dyn_${key}' id='id_dyn_${key}' value='${value}' ${required}>`;
+        } else if (field.type === 'date') {
+            inputHtml = `<input type='date' class='form-control' name='dyn_${key}' id='id_dyn_${key}' value='${value}' ${required}>`;
+        }
+        tableBody.innerHTML += `<tr><th style='width:30%' class='text-end'>${label}${field.required ? ' <span class="text-danger">*</span>' : ''}</th><td>${inputHtml}</td></tr>`;
+    }
+}
+
+async function fetchDynamicFields(categoryId) {
+    if (!categoryId) { dynamicFieldsDiv.innerHTML = ''; return; }
+    const res = await fetch(`/api/dynamic-fields/?category_id=${categoryId}`);
+    const data = await res.json();
+    if (data.success) {
+        renderDynamicFields(data.fields);
+    } else {
+        dynamicFieldsDiv.innerHTML = '';
+    }
+}
+
+if (categoryInput) {
+    categoryInput.addEventListener('change', function() {
+        fetchDynamicFields(this.value);
+    });
+    // Initial load (for edit forms)
+    if (categoryInput.value) {
+        fetchDynamicFields(categoryInput.value);
+    }
+}
+
+// On form submit, collect dynamic field values into hidden input
+const form = document.querySelector('form');
+if (form) {
+    form.addEventListener('submit', function(e) {
+        const dynInputs = dynamicFieldsDiv.querySelectorAll('input');
+        const dynData = {};
+        dynInputs.forEach(input => {
+            const key = input.name.replace('dyn_', '');
+            dynData[key] = input.value;
+        });
+        dynamicDataInput.value = JSON.stringify(dynData);
     });
 }
 </script>

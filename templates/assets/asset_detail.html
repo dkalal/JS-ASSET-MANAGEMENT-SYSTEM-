@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
+{% load asset_extras %}
 {% block title %}Asset Details{% endblock %}
 {% block content %}
-<h2 class="mb-4">Asset Details</h2>
+<h2 class="mb-4">Asset Details {% if accessed_by_uuid %}<span class="badge bg-success">Accessed by UUID</span>{% endif %}</h2>
 <div class="row">
     <div class="col-md-6">
         <dl class="row">
-            <dt class="col-sm-4">ID</dt><dd class="col-sm-8">{{ asset.pk }}</dd>
             <dt class="col-sm-4">Category</dt><dd class="col-sm-8">{{ asset.category }}</dd>
             <dt class="col-sm-4">Status</dt><dd class="col-sm-8">{{ asset.status }}</dd>
             <dt class="col-sm-4">Assigned To</dt><dd class="col-sm-8">{{ asset.assigned_to }}</dd>
@@ -13,13 +13,16 @@
             <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ asset.description }}</dd>
         </dl>
         <h5>Dynamic Fields</h5>
-        <ul>
-        {% for key, value in asset.dynamic_data.items %}
-            <li><strong>{{ key }}:</strong> {{ value }}</li>
-        {% empty %}
-            <li>No dynamic data.</li>
-        {% endfor %}
-        </ul>
+        <table class="table table-bordered table-sm align-middle" style="background:rgba(255,255,255,0.7);">
+            <tbody>
+            {% for key, field in asset.category.dynamic_fields.items %}
+                <tr>
+                    <th class="text-end" style="width:40%">{{ field.label|default:key }}</th>
+                    <td>{{ asset.dynamic_data|get_item:key }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
     </div>
     <div class="col-md-6 text-center">
         {% if asset.qr_code %}
@@ -27,6 +30,10 @@
         <img src="{{ asset.qr_code.url }}" alt="QR Code" class="img-fluid" style="max-width:200px;">
         <div class="mt-2">
             <a href="{{ asset.qr_code.url }}" download class="btn btn-outline-secondary btn-sm">Download QR</a>
+        </div>
+        <div class="mt-2 text-break small">
+            <strong>Asset UUID:</strong> {{ asset.uuid }}<br>
+            <strong>Internal Code:</strong> ASSET|v1|{{ asset.uuid }}
         </div>
         {% endif %}
         {% if asset.images %}
@@ -40,4 +47,5 @@
     </div>
 </div>
 <a href="{% url 'asset_list' %}" class="btn btn-secondary mt-4">Back to List</a>
-{% endblock %} 
+{% endblock %}
+{% comment %} Add this filter in your template tags: @register.filter def get_item(dictionary, key): return dictionary.get(key) {% endcomment %} 

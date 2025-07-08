@@ -1,6 +1,8 @@
 from django import forms
 from .models import Asset
 from django.core.exceptions import ValidationError
+from django.http import QueryDict
+import json
 
 class AssetForm(forms.ModelForm):
     class Meta:
@@ -26,4 +28,17 @@ class AssetForm(forms.ModelForm):
                 raise ValidationError('Document file too large (max 5MB).')
             if not doc.content_type in ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
                 raise ValidationError('Only PDF or Word documents are allowed.')
-        return doc 
+        return doc
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        # Handle dynamic fields from hidden input
+        request = self.initial.get('request')
+        if request:
+            dyn_data = request.POST.get('dynamic_data')
+            if dyn_data:
+                instance.dynamic_data = json.loads(dyn_data)
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance 

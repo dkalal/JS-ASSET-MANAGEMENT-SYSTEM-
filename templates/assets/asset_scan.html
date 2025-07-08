@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% block title %}Scan Asset QR Code{% endblock %}
+{% block content %}
+<h2 class="mb-4">Scan Asset QR Code</h2>
+<div class="row">
+    <div class="col-md-7">
+        <div id="scanner-container" class="mb-3">
+            <video id="scanner-preview" style="width:100%;border-radius:8px;"></video>
+        </div>
+        <button id="start-scan" class="btn btn-primary mb-2">Start Scanning</button>
+        <div class="mb-2">Or enter code manually:</div>
+        <form id="manual-form" class="d-flex gap-2 mb-3">
+            <input type="text" id="manual-code" class="form-control" placeholder="Enter Asset Code or ID">
+            <button type="submit" class="btn btn-outline-secondary">Lookup</button>
+        </form>
+    </div>
+    <div class="col-md-5">
+        <div id="scan-result" class="glass p-3 d-none">
+            <h5>Asset Details</h5>
+            <div id="asset-details"></div>
+        </div>
+        <div id="scan-error" class="alert alert-danger d-none"></div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<script>
+const startBtn = document.getElementById('start-scan');
+const scannerContainer = document.getElementById('scanner-container');
+const preview = document.getElementById('scanner-preview');
+const scanResult = document.getElementById('scan-result');
+const assetDetails = document.getElementById('asset-details');
+const scanError = document.getElementById('scan-error');
+const manualForm = document.getElementById('manual-form');
+const manualCode = document.getElementById('manual-code');
+
+function showAssetDetails(data) {
+    scanResult.classList.remove('d-none');
+    scanError.classList.add('d-none');
+    assetDetails.innerHTML = `<table class='table table-bordered'>
+        <tr><th>Name</th><td>${data.dynamic_data.name || data.dynamic_data.serial_number || ''}</td></tr>
+        <tr><th>Model</th><td>${data.dynamic_data.model || ''}</td></tr>
+        <tr><th>Category</th><td>${data.category_name || ''}</td></tr>
+        <tr><th>Status</th><td>${data.status || ''}</td></tr>
+        <tr><th>Location</th><td>${data.dynamic_data.location || ''}</td></tr>
+        <tr><th>Assigned To</th><td>${data.assigned_to || ''}</td></tr>
+        <tr><th>Created</th><td>${data.created_at || ''}</td></tr>
+    </table>
+    <a href='/assets/${data.id}/' class='btn btn-outline-primary btn-sm'>View Full Details</a>`;
+}
+
+function showError(msg) {
+    scanError.innerHTML = msg;
+    scanError.classList.remove('d-none');
+    scanResult.classList.add('d-none');
+}
+
+function isCameraSupported() {
+    return !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
+}
+
+function fetchAssetByCode(code) {
+    fetch(`/api/asset-by-code/?code=${encodeURIComponent(code)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showAssetDetails(data.asset);
+            } else {
+                showError('Asset not found.');
+            }
+        })
+        .catch(() => showError('Error fetching asset.'));
+}
+
+startBtn.addEventListener('click', function() {
+    scanError.classList.add('d-none');
+    scanResult.classList.add('d-none');
+    if (!isCameraSupported()) {
+        showError('Camera is not supported in this browser or device. Please use a modern browser (Chrome, Firefox, Safari) and ensure your device has a camera.');
+        return;
+    }
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        showError('Camera access requires HTTPS or localhost. Please use a secure connection.');
+        return;
+    }
+    if (typeof Quagga === 'undefined') {
+        showError('QuaggaJS library failed to load. Please check your internet connection.');
+        return;
+    }
+    Quagga.init({
+        inputStream: {
+            name: 'Live',
+            type: 'LiveStream',
+            target: preview,
+            constraints: {
+                facingMode: 'environment',
+            },
+        },
+        decoder: {
+            readers: ['qr_reader']
+        },
+    }, function(err) {
+        if (err) {
+            showError('Camera error: ' + err + '<br>Please ensure your browser allows camera access and you are using HTTPS or localhost.');
+            return;
+        }
+        Quagga.start();
+    });
+    Quagga.onDetected(function(result) {
+        if (result && result.codeResult && result.codeResult.code) {
+            Quagga.stop();
+            fetchAssetByCode(result.codeResult.code);
+        }
+    });
+});
+
+manualForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (manualCode.value.trim()) {
+        fetchAssetByCode(manualCode.value.trim());
+    }
+});
+</script>
+{% endblock %} 

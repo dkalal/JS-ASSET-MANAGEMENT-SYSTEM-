@@ -16,13 +16,19 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from assets.views import asset_create
+from assets.views import asset_create, get_dynamic_fields, AssetListView, AssetDetailView, AssetScanView, asset_by_code, AssetDetailByUUIDView
 from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('assets/register/', asset_create, name='asset_register'),
+    path('api/dynamic-fields/', get_dynamic_fields, name='get_dynamic_fields'),
+    path('assets/', AssetListView.as_view(), name='asset_list'),
+    path('assets/<int:pk>/', AssetDetailView.as_view(), name='asset_detail'),
+    path('scan/', AssetScanView.as_view(), name='asset_scan'),
+    path('api/asset-by-code/', asset_by_code, name='asset_by_code'),
+    path('assets/<uuid:uuid>/', AssetDetailByUUIDView.as_view(), name='asset_detail_by_uuid'),
 ]
 
 if settings.DEBUG:

@@ -2,31 +2,64 @@
 {% block title %}Asset List{% endblock %}
 {% block content %}
 <h2 class="mb-4">All Assets</h2>
+<form method="get" class="row g-2 mb-3 align-items-end">
+    <div class="col-md-3">
+        <label class="form-label">Category</label>
+        <select name="category" class="form-select">
+            <option value="">All</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select">
+            <option value="">All</option>
+            {% for val, label in statuses %}
+            <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Location</label>
+        <input type="text" name="location" class="form-control" value="{{ request.GET.location }}">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Search</label>
+        <input type="text" name="search" class="form-control" placeholder="Name, Model, Description" value="{{ request.GET.search }}">
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Filter</button>
+    </div>
+</form>
 <table class="table table-hover table-bordered glass">
     <thead class="table-light">
         <tr>
-            <th>ID</th>
+            <th>Name</th>
+            <th>Model</th>
             <th>Category</th>
             <th>Status</th>
+            <th>Location</th>
             <th>Assigned To</th>
             <th>Created</th>
-            <th>QR</th>
             <th>Actions</th>
         </tr>
     </thead>
     <tbody>
         {% for asset in assets %}
         <tr>
-            <td>{{ asset.pk }}</td>
+            <td>{{ asset.dynamic_data.name|default:asset.dynamic_data.serial_number }}</td>
+            <td>{{ asset.dynamic_data.model }}</td>
             <td>{{ asset.category }}</td>
             <td>{{ asset.status }}</td>
+            <td>{{ asset.dynamic_data.location }}</td>
             <td>{{ asset.assigned_to }}</td>
             <td>{{ asset.created_at|date:'Y-m-d H:i' }}</td>
-            <td>{% if asset.qr_code %}<img src="{{ asset.qr_code.url }}" alt="QR" style="height:40px;">{% endif %}</td>
             <td><a href="{% url 'asset_detail' asset.pk %}" class="btn btn-sm btn-outline-primary">View</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center">No assets found.</td></tr>
+        <tr><td colspan="8" class="text-center">No assets found.</td></tr>
         {% endfor %}
     </tbody>
 </table>
