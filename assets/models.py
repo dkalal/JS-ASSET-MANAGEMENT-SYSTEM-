@@ -53,3 +53,14 @@ class Asset(models.Model):
 
     def __str__(self):
         return f"{self.category.name} Asset #{self.pk}"
+
+class ExportLog(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    format = models.CharField(max_length=10)
+    columns = models.JSONField()
+    filters = models.JSONField()
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True)
+    def __str__(self):
+        return f"Export by {self.user} on {self.timestamp:%Y-%m-%d %H:%M} ({self.format})"

@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
+{% load asset_extras %}
 {% block title %}Asset List{% endblock %}
 {% block content %}
 <h2 class="mb-4">All Assets</h2>
 <form method="get" class="row g-2 mb-3 align-items-end">
     <div class="col-md-3">
         <label class="form-label">Category</label>
-        <select name="category" class="form-select">
+        <select name="category" class="form-select" id="category-select">
             <option value="">All</option>
             {% for cat in categories %}
             <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.name }}</option>
@@ -29,13 +30,37 @@
         <label class="form-label">Search</label>
         <input type="text" name="search" class="form-control" placeholder="Name, Model, Description" value="{{ request.GET.search }}">
     </div>
-    <div class="col-md-2">
-        <button type="submit" class="btn btn-primary w-100">Filter</button>
+    <div class="col-md-2 d-flex flex-column">
+        <button type="submit" class="btn btn-primary w-100 mb-1">Filter</button>
+        <a href="?" class="btn btn-outline-secondary w-100">Clear Filters</a>
     </div>
+    {% if dynamic_fields %}
+        <div class="w-100"></div>
+        {% for field in dynamic_fields %}
+        <div class="col-md-3">
+            <label class="form-label">{{ field.label }}</label>
+            {% if field.type == 'text' %}
+                <input type="text" name="dyn_{{ field.key }}" class="form-control" value="{{ request.GET|get_item:'dyn_'|add:field.key }}">
+            {% elif field.type == 'number' %}
+                <input type="number" name="dyn_{{ field.key }}" class="form-control" value="{{ request.GET|get_item:'dyn_'|add:field.key }}">
+            {% elif field.type == 'date' %}
+                <input type="date" name="dyn_{{ field.key }}" class="form-control" value="{{ request.GET|get_item:'dyn_'|add:field.key }}">
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% endif %}
 </form>
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <a href="{% url 'asset_register' %}" class="btn btn-primary">Register New Asset</a>
+    <div>
+      <a href="{% url 'asset_bulk_import' %}" class="btn btn-outline-primary me-2">Bulk Import</a>
+      <button id="openExportModal" class="btn btn-outline-success" type="button">Export</button>
+    </div>
+</div>
 <table class="table table-hover table-bordered glass">
     <thead class="table-light">
         <tr>
+            <th><input type="checkbox" id="select-all-assets"></th>
             <th>Name</th>
             <th>Model</th>
             <th>Category</th>
@@ -49,6 +74,7 @@
     <tbody>
         {% for asset in assets %}
         <tr>
+            <td><input type="checkbox" class="asset-checkbox" value="{{ asset.pk }}"></td>
             <td>{{ asset.dynamic_data.name|default:asset.dynamic_data.serial_number }}</td>
             <td>{{ asset.dynamic_data.model }}</td>
             <td>{{ asset.category }}</td>
@@ -59,9 +85,184 @@
             <td><a href="{% url 'asset_detail' asset.pk %}" class="btn btn-sm btn-outline-primary">View</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="8" class="text-center">No assets found.</td></tr>
+        <tr><td colspan="9" class="text-center">No assets found.</td></tr>
         {% endfor %}
     </tbody>
 </table>
-<a href="{% url 'asset_register' %}" class="btn btn-primary">Register New Asset</a>
+<!-- Custom Export Modal (Bootstrap-independent) -->
+<style>
+.custom-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.5);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+}
+.custom-modal-overlay.active {
+  display: flex;
+}
+.custom-modal {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37);
+  padding: 0;
+  overflow: hidden;
+}
+.custom-modal-header {
+  background: #00A6EB;
+  color: #fff;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.custom-modal-body {
+  padding: 1.5rem;
+}
+.custom-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #fff;
+  cursor: pointer;
+}
+</style>
+<div id="exportModalCustom" class="custom-modal-overlay" tabindex="-1">
+  <div class="custom-modal" role="dialog" aria-modal="true" aria-labelledby="exportModalCustomLabel">
+    <div class="custom-modal-header">
+      <h5 class="modal-title" id="exportModalCustomLabel">Export Assets</h5>
+      <button type="button" class="custom-modal-close" id="closeExportModal" aria-label="Close">&times;</button>
+    </div>
+    <div class="custom-modal-body">
+      <form id="export-form" method="post" action="{% url 'asset_export' %}">
+        {% csrf_token %}
+        <input type="hidden" name="selected_ids" id="selected-asset-ids">
+        <div class="alert alert-info py-2" id="export-summary">You are exporting all filtered assets.</div>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">Format</label>
+            <select name="format" class="form-select" required>
+              <option value="csv">CSV</option>
+              <option value="xlsx">Excel</option>
+              <option value="pdf">PDF</option>
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Columns to Export</label>
+            <div class="row" id="export-columns-list">
+              <!-- Columns will be dynamically populated by JS in next step -->
+              <div class="col-12"><em>Column selection coming soon...</em></div>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+          <button type="submit" class="btn btn-success">Export</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+// Custom modal open/close logic
+const openExportModalBtn = document.getElementById('openExportModal');
+const exportModalCustom = document.getElementById('exportModalCustom');
+const closeExportModalBtn = document.getElementById('closeExportModal');
+openExportModalBtn.addEventListener('click', () => {
+  exportModalCustom.classList.add('active');
+  exportModalCustom.focus();
+});
+closeExportModalBtn.addEventListener('click', () => {
+  exportModalCustom.classList.remove('active');
+});
+exportModalCustom.addEventListener('click', (e) => {
+  if (e.target === exportModalCustom) {
+    exportModalCustom.classList.remove('active');
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && exportModalCustom.classList.contains('active')) {
+    exportModalCustom.classList.remove('active');
+  }
+});
+// Asset selection logic
+const selectAllCheckbox = document.getElementById('select-all-assets');
+const assetCheckboxes = document.querySelectorAll('.asset-checkbox');
+selectAllCheckbox.addEventListener('change', function() {
+  assetCheckboxes.forEach(cb => { cb.checked = this.checked; });
+  updateExportSummary();
+});
+assetCheckboxes.forEach(cb => {
+  cb.addEventListener('change', updateExportSummary);
+});
+function getSelectedAssetIds() {
+  return Array.from(assetCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
+}
+function updateExportSummary() {
+  const selected = getSelectedAssetIds();
+  const summary = document.getElementById('export-summary');
+  const hiddenInput = document.getElementById('selected-asset-ids');
+  if (selected.length > 0) {
+    summary.textContent = `You are exporting ${selected.length} selected asset${selected.length > 1 ? 's' : ''}.`;
+    hiddenInput.value = selected.join(',');
+  } else {
+    summary.textContent = 'You are exporting all filtered assets.';
+    hiddenInput.value = '';
+  }
+}
+// Dynamically populate export columns
+function getColumns() {
+    let columns = [
+        {key: 'ID', label: 'ID'},
+        {key: 'Category', label: 'Category'},
+        {key: 'Status', label: 'Status'},
+        {key: 'Assigned To', label: 'Assigned To'},
+        {key: 'Created', label: 'Created'},
+        {key: 'Updated', label: 'Updated'}
+    ];
+    {% if dynamic_fields %}
+        {% for field in dynamic_fields %}
+            columns.push({key: '{{ field.key }}', label: '{{ field.label }}'});
+        {% endfor %}
+    {% endif %}
+    return columns;
+}
+function renderExportColumns() {
+    const columns = getColumns();
+    const container = document.getElementById('export-columns-list');
+    container.innerHTML = '';
+    columns.forEach(col => {
+        const div = document.createElement('div');
+        div.className = 'col-md-4 mb-1';
+        div.innerHTML = `<div class='form-check'>
+            <input class='form-check-input export-col' type='checkbox' name='columns' value='${col.key}' id='col_${col.key}' checked>
+            <label class='form-check-label' for='col_${col.key}'>${col.label}</label>
+        </div>`;
+        container.appendChild(div);
+    });
+    const controls = document.createElement('div');
+    controls.className = 'col-12 mb-2';
+    controls.innerHTML = `<button type='button' class='btn btn-sm btn-link' onclick='selectAllExportCols(true)'>Select All</button> |
+        <button type='button' class='btn btn-sm btn-link' onclick='selectAllExportCols(false)'>Deselect All</button>`;
+    container.prepend(controls);
+}
+function selectAllExportCols(val) {
+    document.querySelectorAll('.export-col').forEach(cb => { cb.checked = val; });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    renderExportColumns();
+    updateExportSummary();
+    // Ensure only checked columns are submitted
+    document.getElementById('export-form').addEventListener('submit', function(e) {
+        document.querySelectorAll('.export-col').forEach(cb => {
+            if (!cb.checked) cb.disabled = true;
+        });
+    });
+});
+</script>
 {% endblock %} 
