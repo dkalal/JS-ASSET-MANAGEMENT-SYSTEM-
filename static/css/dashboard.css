@@ -1,0 +1,100 @@
+/* Dashboard Glassmorphism & Theme Variables */
+:root {
+  --primary: #00A6EB;
+  --secondary: #176B87;
+  --accent: #04364A;
+  --background: #B4E9FC;
+  --surface: rgba(255,255,255,0.25);
+  --shadow: 0 8px 32px 0 rgba(31,38,135,0.18);
+  --text: #222;
+  --border: 1px solid rgba(255,255,255,0.18);
+}
+[data-theme="dark"] {
+  --primary: #176B87;
+  --secondary: #00A6EB;
+  --accent: #B4E9FC;
+  --background: #04364A;
+  --surface: rgba(30,34,40,0.35);
+  --shadow: 0 8px 32px 0 rgba(0,0,0,0.28);
+  --text: #f3f3f3;
+  --border: 1px solid rgba(30,34,40,0.28);
+}
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--text);
+  font-family: 'Segoe UI', Arial, sans-serif;
+  transition: background 0.3s, color 0.3s;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+.glass {
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border-radius: 18px;
+  border: var(--border);
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.dashboard-sidebar {
+  position: fixed;
+  top: 24px; left: 24px; bottom: 24px;
+  width: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  border-radius: 24px;
+  z-index: 100;
+  padding: 16px 0;
+  border: var(--border);
+}
+.dashboard-sidebar .nav-icon {
+  width: 32px; height: 32px;
+  margin: 18px 0;
+  fill: var(--accent);
+  opacity: 0.7;
+  transition: fill 0.2s, opacity 0.2s;
+  cursor: pointer;
+}
+.dashboard-sidebar .nav-icon.active,
+.dashboard-sidebar .nav-icon:hover {
+  fill: var(--primary);
+  opacity: 1;
+}
+.dashboard-topbar {
+  position: fixed;
+  top: 24px; left: 120px; right: 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  border-radius: 18px;
+  z-index: 101;
+  padding: 0 32px;
+  border: var(--border);
+}
+.dashboard-content {
+  margin-left: 120px;
+  margin-top: 104px;
+  padding: 0;
+  min-height: calc(100vh - 104px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.dashboard-content > * {
+  margin: 0 32px;
+}
+@media (max-width: 900px) {
+  .dashboard-sidebar { left: 0; top: 0; bottom: 0; border-radius: 0; width: 60px; }
+  .dashboard-topbar { left: 60px; top: 0; right: 0; border-radius: 0; height: 56px; padding: 0 12px; }
+  .dashboard-content { margin-left: 60px; margin-top: 72px; min-height: calc(100vh - 72px); }
+  .dashboard-content > * { margin: 0 8px; }
+}
+/* Add more as needed for cards, table, etc. */ 

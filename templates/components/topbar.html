@@ -1,0 +1,103 @@
+<header class="dashboard-topbar glass">
+  <div class="d-flex align-items-center me-4">
+    <img src="/static/img/logo.png" alt="Logo" style="height:36px; margin-right:12px;">
+    {% comment %} <span class="fw-bold" style="font-size:1.3rem; color:var(--primary);">Assets</span> {% endcomment %}
+  </div>
+  <nav class="d-flex align-items-center gap-2 me-4">
+    <a href="/assets/" class="btn btn-pill btn-sm btn-outline-primary active">Assets</a>
+    <a href="/documents/" class="btn btn-pill btn-sm btn-outline-secondary">Documents</a>
+    <a href="/reports/" class="btn btn-pill btn-sm btn-outline-secondary">Reports</a>
+    <a href="/audit/" class="btn btn-pill btn-sm btn-outline-secondary">Audit</a>
+  </nav>
+  <form class="flex-grow-1 d-flex align-items-center mx-4" style="max-width:400px;">
+    <input type="search" class="form-control glass" placeholder="Search assets..." style="border-radius:18px;">
+  </form>
+  <div class="d-flex align-items-center gap-2">
+    <button class="btn btn-outline-secondary btn-sm">Import</button>
+    <button class="btn btn-outline-secondary btn-sm">Export</button>
+    <button class="btn btn-primary btn-sm">Add Asset</button>
+    <button id="theme-toggle-btn" class="btn btn-glass btn-sm d-flex align-items-center justify-content-center"
+      title="Toggle dark/light mode"
+      style="padding: 0.35rem 0.6rem; border-radius: 50%; box-shadow: 0 2px 8px 0 rgba(23,107,135,0.10); border: none; background: rgba(255,255,255,0.22); transition: background 0.18s, box-shadow 0.18s;">
+      <svg id="theme-toggle-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false"
+        style="display: block;">
+        <defs>
+          <radialGradient id="sunGradient" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#FFD700"/>
+            <stop offset="100%" stop-color="#FFB300"/>
+          </radialGradient>
+          <radialGradient id="moonGradient" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#B4E9FC"/>
+            <stop offset="100%" stop-color="#176B87"/>
+          </radialGradient>
+        </defs>
+        <g id="sun-icon">
+          <circle cx="12" cy="12" r="5" fill="url(#sunGradient)" stroke="#FFC107" stroke-width="1.2"/>
+          <g stroke="#FFC107" stroke-width="1.2" stroke-linecap="round">
+            <line x1="12" y1="2" x2="12" y2="4"/>
+            <line x1="12" y1="20" x2="12" y2="22"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="2" y1="12" x2="4" y2="12"/>
+            <line x1="20" y1="12" x2="22" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </g>
+        </g>
+        <g id="moon-icon" style="display:none;">
+          <path d="M17 12.5A5.5 5.5 0 0 1 11.5 7c0-2.5 1.5-4.5 4-5a8 8 0 1 0 6.5 11c-2.5.5-4.5-1.5-5-4z"
+            fill="url(#moonGradient)" stroke="#176B87" stroke-width="1.2"/>
+        </g>
+      </svg>
+      <span class="visually-hidden">Toggle dark/light mode</span>
+    </button>
+    <script>
+      // Enhance theme icon for glass/Apple style
+      document.addEventListener('DOMContentLoaded', function() {
+        function updateThemeIcon() {
+          const theme = localStorage.getItem('theme') || 'light';
+          const sun = document.querySelector('#theme-toggle-icon #sun-icon');
+          const moon = document.querySelector('#theme-toggle-icon #moon-icon');
+          if (theme === 'dark') {
+            sun.style.display = 'none';
+            moon.style.display = '';
+          } else {
+            sun.style.display = '';
+            moon.style.display = 'none';
+          }
+        }
+        updateThemeIcon();
+        const btn = document.getElementById('theme-toggle-btn');
+        if (btn) {
+          btn.addEventListener('click', function() {
+            setTimeout(updateThemeIcon, 120); // sync with theme change
+          });
+        }
+        window.addEventListener('storage', updateThemeIcon);
+      });
+    </script>
+    <div class="dropdown ms-3">
+      <button class="btn btn-avatar dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="background:var(--accent); color:#fff; border-radius:50%; width:40px; height:40px; font-weight:bold; display:flex; align-items:center; justify-content:center;">
+        {% if user.profile_image %}
+          <img src="{{ user.profile_image.url }}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        {% else %}
+          {% with fn=user.first_name|default_if_none:'' ln=user.last_name|default_if_none:'' %}
+            {% if fn or ln %}
+              <span style="font-size:1.1rem;">{{ fn|slice:':1' }}{{ ln|slice:':1' }}</span>
+            {% elif user.username %}
+              <span style="font-size:1.1rem;">{{ user.username|slice:':2'|upper }}</span>
+            {% else %}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/></svg>
+            {% endif %}
+          {% endwith %}
+        {% endif %}
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+        <li><a class="dropdown-item" href="/profile/">Profile</a></li>
+        <li><a class="dropdown-item" href="/settings/">Settings</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="/logout/">Logout</a></li>
+      </ul>
+    </div>
+  </div>
+</header> 

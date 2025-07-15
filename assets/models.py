@@ -38,6 +38,7 @@ class Asset(models.Model):
         ('maintenance', 'Maintenance'),
         ('retired', 'Retired'),
         ('lost', 'Lost'),
+        ('transferred', 'Transferred'),
     ]
     category = models.ForeignKey(AssetCategory, on_delete=models.CASCADE, related_name='assets')
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -50,6 +51,15 @@ class Asset(models.Model):
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Depreciation fields
+    purchase_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Initial purchase value for depreciation")
+    purchase_date = models.DateField(null=True, blank=True, help_text="Date of purchase/acquisition")
+    DEPRECIATION_METHOD_CHOICES = [
+        ('straight_line', 'Straight Line'),
+        # Add more methods as needed
+    ]
+    depreciation_method = models.CharField(max_length=32, choices=DEPRECIATION_METHOD_CHOICES, default='straight_line', help_text="Depreciation method")
+    useful_life_years = models.PositiveIntegerField(null=True, blank=True, help_text="Useful life in years for depreciation")
 
     def __str__(self):
         return f"{self.category.name} Asset #{self.pk}"

@@ -18,8 +18,25 @@ class AssetCategoryAdmin(admin.ModelAdmin):
 
     def save_formset(self, request, form, formset, change):
         super().save_formset(request, form, formset, change)
-        # After saving fields, update dynamic_fields JSON
+        # Ensure required dynamic fields exist
         category = form.instance
+        required_fields = [
+            {'key': 'serial_number', 'label': 'Serial Number', 'type': 'text'},
+            {'key': 'model', 'label': 'Model', 'type': 'text'},
+            {'key': 'purchase_date', 'label': 'Purchase Date', 'type': 'date'},
+            {'key': 'condition', 'label': 'Condition', 'type': 'text'},
+            {'key': 'location', 'label': 'Location', 'type': 'text'},
+        ]
+        for field in required_fields:
+            if not category.fields.filter(key=field['key']).exists():
+                AssetCategoryField.objects.create(
+                    category=category,
+                    key=field['key'],
+                    label=field['label'],
+                    type=field['type'],
+                    required=True
+                )
+        # After saving fields, update dynamic_fields JSON
         fields = category.fields.all()
         schema = {}
         for f in fields:
@@ -47,11 +64,15 @@ class AssetResource(resources.ModelResource):
 @admin.register(Asset)
 class AssetAdmin(ImportExportModelAdmin):
     resource_class = AssetResource
-    list_display = ('pk', 'category', 'status', 'assigned_to', 'created_at')
-    list_filter = ('status', 'category')
+    list_display = ('pk', 'category', 'status', 'assigned_to', 'created_at', 'purchase_value', 'purchase_date', 'depreciation_method', 'useful_life_years')
+    list_filter = ('status', 'category', 'depreciation_method')
     search_fields = ('description',)
     actions = ['export_as_pdf']
-
+    fieldsets = (
+        (None, {
+            'fields': ('category', 'status', 'assigned_to', 'description', 'purchase_value', 'purchase_date', 'depreciation_method', 'useful_life_years', 'qr_code', 'images', 'documents', 'dynamic_data')
+        }),
+    )
     def export_as_pdf(self, request, queryset):
         # TODO: Implement PDF export with branding
         self.message_user(request, 'PDF export coming soon!')

@@ -75,7 +75,15 @@
         {% for asset in assets %}
         <tr>
             <td><input type="checkbox" class="asset-checkbox" value="{{ asset.pk }}"></td>
-            <td>{{ asset.dynamic_data.name|default:asset.dynamic_data.serial_number }}</td>
+            <td>
+              {% if asset.dynamic_data.name %}
+                {{ asset.dynamic_data.name }}
+              {% elif asset.dynamic_data.serial_number %}
+                {{ asset.dynamic_data.serial_number }}
+              {% else %}
+                <span class="text-danger">N/A</span>
+              {% endif %}
+            </td>
             <td>{{ asset.dynamic_data.model }}</td>
             <td>{{ asset.category }}</td>
             <td>{{ asset.status }}</td>

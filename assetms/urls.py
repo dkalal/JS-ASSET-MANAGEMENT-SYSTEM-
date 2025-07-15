@@ -16,11 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from assets.views import asset_create, get_dynamic_fields, AssetListView, AssetDetailView, AssetScanView, asset_by_code, AssetDetailByUUIDView, asset_export, AssetBulkImportView, download_import_template
+from assets.views import (
+    asset_create, get_dynamic_fields, AssetListView, AssetDetailView, AssetScanView, asset_by_code, AssetDetailByUUIDView, asset_export, AssetBulkImportView, download_import_template, dashboard_summary_api, dashboard_activity_api, dashboard_chart_data_api,
+    recent_added_assets_api, recent_scans_api, recent_transfers_api, recent_maintenance_api, full_audit_log_api
+)
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views
 from django.views.generic import TemplateView
+from reports.views import reports_dashboard, generate_report
+from audit.views import audit_dashboard
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -32,12 +37,23 @@ urlpatterns = [
     path('api/asset-by-code/', asset_by_code, name='asset_by_code'),
     path('assets/<uuid:uuid>/', AssetDetailByUUIDView.as_view(), name='asset_detail_by_uuid'),
     path('dashboard/', TemplateView.as_view(template_name='dashboard.html'), name='dashboard'),
+    path('dashboard_summary_api/', dashboard_summary_api, name='dashboard_summary_api'),
+    path('dashboard_activity_api/', dashboard_activity_api, name='dashboard_activity_api'),
+    path('dashboard_chart_data_api/', dashboard_chart_data_api, name='dashboard_chart_data_api'),
     path('login/', auth_views.LoginView.as_view(template_name='assets/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
     path('assets/export/', asset_export, name='asset_export'),
     path('test-modal/', TemplateView.as_view(template_name='test_modal.html'), name='test_modal'),
     path('assets/bulk-import/', AssetBulkImportView.as_view(), name='asset_bulk_import'),
     path('assets/download-import-template/', download_import_template, name='download_import_template'),
+    path('reports/', reports_dashboard, name='reports_dashboard'),
+    path('reports/generate/', generate_report, name='generate_report'),
+    path('audit/', audit_dashboard, name='audit_dashboard'),
+    path('recent-added-assets-api/', recent_added_assets_api, name='recent_added_assets_api'),
+    path('recent-scans-api/', recent_scans_api, name='recent_scans_api'),
+    path('recent-transfers-api/', recent_transfers_api, name='recent_transfers_api'),
+    path('recent-maintenance-api/', recent_maintenance_api, name='recent_maintenance_api'),
+    path('full-audit-log-api/', full_audit_log_api, name='full_audit_log_api'),
 ]
 
 if settings.DEBUG:

@@ -29,6 +29,9 @@ from django.db import transaction
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from audit.models import AuditLog
+from audit.utils import log_audit
+from django.core.paginator import Paginator, EmptyPage
+from django.utils.timezone import localtime
 
 # Permission check: only admin/manager
 def is_admin_or_manager(user):
@@ -53,6 +56,7 @@ class AssetCreateView(CreateView):
         qr.save(buffer, 'PNG')
         asset.qr_code.save(f"asset_{asset.uuid}.png", ContentFile(buffer.getvalue()), save=False)
         asset.save()
+        log_audit(self.request.user, 'create', asset, 'Asset created via dashboard')
         return super().form_valid(form)
 
     def get_form_kwargs(self):
@@ -61,7 +65,7 @@ class AssetCreateView(CreateView):
         kwargs['initial']['request'] = self.request
         return kwargs
 
-asset_create = login_required(AssetCreateView.as_view())
+asset_create = user_passes_test(is_admin_or_manager, login_url='login')(AssetCreateView.as_view())
 
 @require_GET
 def get_dynamic_fields(request):
@@ -80,10 +84,17 @@ class AssetListView(ListView):
 
     def get_queryset(self):
         qs = super().get_queryset().select_related('category', 'assigned_to')
+        user = self.request.user
+        role = getattr(user, 'role', 'user')
+        # Enforce role-based filtering
+        if role == 'user':
+            qs = qs.filter(assigned_to=user)
         category = self.request.GET.get('category')
         status = self.request.GET.get('status')
         location = self.request.GET.get('location')
         search = self.request.GET.get('search')
+        assigned = self.request.GET.get('assigned')
+        warranty = self.request.GET.get('warranty')
         # Dynamic field filters
         dynamic_filters = {}
         if category:
@@ -105,6 +116,15 @@ class AssetListView(ListView):
                         qs = qs.filter(**{f'dynamic_data__{field.key}': val})
         if status:
             qs = qs.filter(status=status)
+        if assigned == 'yes':
+            qs = qs.filter(assigned_to__isnull=False)
+        elif assigned == 'no':
+            qs = qs.filter(assigned_to__isnull=True)
+        if warranty == 'expiring':
+            from datetime import timedelta
+            from django.utils import timezone
+            soon = timezone.now() + timedelta(days=30)
+            qs = qs.filter(dynamic_data__warranty_expiry__lte=soon.date().isoformat(), dynamic_data__warranty_expiry__gte=timezone.now().date().isoformat())
         if location:
             qs = qs.filter(dynamic_data__location__icontains=location)
         if search:
@@ -134,6 +154,7 @@ class AssetDetailView(DetailView):
 
     def get(self, request, *args, **kwargs):
         asset = self.get_object()
+        log_audit(request.user, 'view', asset, 'Asset viewed via dashboard')
         # Redirect to UUID-based URL if accessed by PK
         return redirect('asset_detail_by_uuid', uuid=asset.uuid)
 
@@ -157,6 +178,8 @@ def asset_by_code(request):
         if not asset and code.isdigit():
             asset = Asset.objects.filter(pk=int(code)).first()
     if asset:
+        # Log QR code scan
+        log_audit(request.user, 'scan', asset, f'QR code scanned: {code}')
         data = {
             'id': asset.pk,
             'dynamic_data': asset.dynamic_data,
@@ -262,6 +285,7 @@ def asset_export(request):
             if large_export:
                 response['X-Export-Warning'] = 'Export is very large and may take time.'
             df.to_csv(response, index=False)
+            log_audit(request.user, 'export', None, 'Assets exported as CSV')
             return response
         elif format == 'xlsx':
             df = pd.DataFrame(data)
@@ -271,6 +295,7 @@ def asset_export(request):
                 response['X-Export-Warning'] = 'Export is very large and may take time.'
             with pd.ExcelWriter(response, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Assets')
+            log_audit(request.user, 'export', None, 'Assets exported as Excel')
             return response
         elif format == 'pdf':
             html_string = render_to_string('assets/export_pdf.html', {
@@ -292,6 +317,7 @@ def asset_export(request):
             response['Content-Disposition'] = f'attachment; filename="assets_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"'
             if large_export:
                 response['X-Export-Warning'] = 'Export is very large and may take time.'
+            log_audit(request.user, 'export', None, 'Assets exported as PDF')
             return response
         else:
             log.success = False
@@ -422,6 +448,7 @@ class AssetBulkImportView(View):
                         asset.dynamic_data = dyn_data
                         asset.save()
                         success_count += 1
+                        log_audit(request.user, 'create', asset, f'Asset imported via bulk import (row {i+2})')
                     except Exception as e:
                         fail_count += 1
                         fail_rows.append({'row': i+2, 'error': str(e)})
@@ -492,33 +519,63 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
 @login_required
 @require_GET
-@csrf_exempt
 def dashboard_summary_api(request):
+    from datetime import timedelta
+    from django.utils import timezone
     user = request.user
     role = getattr(user, 'role', 'user')
     qs = Asset.objects.all()
     if role == 'user':
         qs = qs.filter(assigned_to=user)
-    elif role == 'manager':
-        # Example: managers see all, or filter by department if available
-        pass
-    # Asset counts
+    # KPIs
     total_assets = qs.count()
-    by_status = {k: qs.filter(status=k).count() for k, _ in Asset.STATUS_CHOICES}
+    active_assets = qs.filter(status='active').count()
+    maintenance_assets = qs.filter(status='maintenance').count()
+    retired_assets = qs.filter(status='retired').count()
+    lost_assets = qs.filter(status='lost').count()
+    assigned_assets = qs.filter(assigned_to__isnull=False).count()
+    unassigned_assets = qs.filter(assigned_to__isnull=True).count()
+    # Warranty expiry (assuming dynamic_data has 'warranty_expiry' as ISO date string)
+    soon = timezone.now() + timedelta(days=30)
+    warranty_expiring_soon = qs.filter(dynamic_data__warranty_expiry__lte=soon.date().isoformat(), dynamic_data__warranty_expiry__gte=timezone.now().date().isoformat()).count()
+    # Transferred assets (assuming status or audit log, fallback to status='transferred' if exists)
+    transferred_assets = qs.filter(status='transferred').count() if 'transferred' in dict(Asset.STATUS_CHOICES) else 0
+    # By category
     by_category = {}
     for cat in AssetCategory.objects.all():
         cat_qs = qs.filter(category=cat)
         by_category[cat.name] = cat_qs.count()
-    # Optionally, add department breakdown if available
+    # Trends (example: monthly change in total assets)
+    month_ago = timezone.now() - timedelta(days=30)
+    total_assets_month_ago = qs.filter(created_at__lte=month_ago).count()
+    total_assets_monthly_change = None
+    if total_assets_month_ago:
+        total_assets_monthly_change = f"{((total_assets - total_assets_month_ago) / total_assets_month_ago) * 100:.1f}%"
+    else:
+        total_assets_monthly_change = "N/A"
+    # TODO: Consider logging dashboard summary API access for auditability
     return JsonResponse({
-        'total_assets': total_assets,
-        'by_status': by_status,
+        'kpis': {
+            'total_assets': total_assets,
+            'active_assets': active_assets,
+            'maintenance_assets': maintenance_assets,
+            'retired_assets': retired_assets,
+            'lost_assets': lost_assets,
+            'assigned_assets': assigned_assets,
+            'unassigned_assets': unassigned_assets,
+            'warranty_expiring_soon': warranty_expiring_soon,
+            'transferred_assets': transferred_assets,
+        },
         'by_category': by_category,
+        'trends': {
+            'total_assets_monthly_change': total_assets_monthly_change,
+        },
+        'role': role,
+        'user_id': user.id,
     })
 
 @login_required
 @require_GET
-@csrf_exempt
 def dashboard_activity_api(request):
     user = request.user
     role = getattr(user, 'role', 'user')
@@ -534,16 +591,16 @@ def dashboard_activity_api(request):
             'user': str(log.user) if log.user else '',
             'action': log.action,
             'asset': str(log.asset) if log.asset else '',
-            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M'),
+            'timestamp': localtime(log.timestamp).strftime('%Y-%m-%d %H:%M'),
             'details': log.details,
         }
         for log in logs
     ]
+    # TODO: Consider logging dashboard activity API access for auditability
     return JsonResponse({'activity': data})
 
 @login_required
 @require_GET
-@csrf_exempt
 def dashboard_scan_logs_api(request):
     user = request.user
     role = getattr(user, 'role', 'user')
@@ -558,8 +615,262 @@ def dashboard_scan_logs_api(request):
         {
             'user': str(log.user) if log.user else '',
             'asset': str(log.asset) if log.asset else '',
-            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M'),
+            'timestamp': localtime(log.timestamp).strftime('%Y-%m-%d %H:%M'),
         }
         for log in logs
     ]
+    # TODO: Consider logging dashboard scan logs API access for auditability
     return JsonResponse({'scan_logs': data})
+
+@login_required
+@require_GET
+def dashboard_chart_data_api(request):
+    from django.db.models import Count
+    from django.utils import timezone
+    import calendar
+    import datetime
+    user = request.user
+    role = getattr(user, 'role', 'user')
+    qs = Asset.objects.all()
+    if role == 'user':
+        qs = qs.filter(assigned_to=user)
+    chart = request.GET.get('chart')
+    if not chart or chart not in {'category', 'acquisition', 'department', 'location', 'depreciation'}:
+        return JsonResponse({'error': 'Invalid or missing chart type'}, status=400)
+    data = []
+    labels = []
+    # 1. Assets by Category
+    if chart == 'category':
+        agg = qs.values('category__name').annotate(count=Count('id')).order_by('-count')
+        labels = [a['category__name'] for a in agg]
+        data = [a['count'] for a in agg]
+        return JsonResponse({'chart': 'assets_by_category', 'labels': labels, 'data': data, 'role': role})
+    # 2. Asset Acquisition Over Time (last 12 months)
+    elif chart == 'acquisition':
+        now = timezone.now()
+        months = [(now - datetime.timedelta(days=30*i)).strftime('%Y-%m') for i in reversed(range(12))]
+        month_counts = {m: 0 for m in months}
+        for asset in qs:
+            m = asset.created_at.strftime('%Y-%m')
+            if m in month_counts:
+                month_counts[m] += 1
+        labels = list(month_counts.keys())
+        data = list(month_counts.values())
+        return JsonResponse({'chart': 'acquisition_over_time', 'labels': labels, 'data': data, 'role': role})
+    # 3. Assets by Department (dynamic field)
+    elif chart == 'department':
+        from django.db.models import Count, Value as V
+        from django.db.models.functions import Coalesce
+        from django.db.models.expressions import RawSQL
+        try:
+            # Use KeyTextTransform for JSONField key extraction (Django >=3.1)
+            from django.db.models.functions import Cast
+            from django.db.models import CharField
+            qs_with_dept = qs.annotate(
+                department=Cast('dynamic_data__department', CharField())
+            )
+            agg = qs_with_dept.values('department').annotate(count=Count('id')).order_by('-count')
+            labels = [a['department'] or 'Unspecified' for a in agg]
+            data = [a['count'] for a in agg]
+        except Exception:
+            # Fallback to Python loop if ORM fails
+            dept_counts = {}
+            for asset in qs:
+                dept = asset.dynamic_data.get('department', 'Unspecified')
+                dept_counts[dept] = dept_counts.get(dept, 0) + 1
+            labels = list(dept_counts.keys())
+            data = list(dept_counts.values())
+        return JsonResponse({'chart': 'assets_by_department', 'labels': labels, 'data': data, 'role': role})
+    # 4. Assets by Location (dynamic field)
+    elif chart == 'location':
+        from django.db.models import Count, Value as V
+        from django.db.models.functions import Coalesce
+        from django.db.models.expressions import RawSQL
+        try:
+            from django.db.models.functions import Cast
+            from django.db.models import CharField
+            qs_with_loc = qs.annotate(
+                location=Cast('dynamic_data__location', CharField())
+            )
+            agg = qs_with_loc.values('location').annotate(count=Count('id')).order_by('-count')
+            labels = [a['location'] or 'Unspecified' for a in agg]
+            data = [a['count'] for a in agg]
+        except Exception:
+            loc_counts = {}
+            for asset in qs:
+                loc = asset.dynamic_data.get('location', 'Unspecified')
+                loc_counts[loc] = loc_counts.get(loc, 0) + 1
+            labels = list(loc_counts.keys())
+            data = list(loc_counts.values())
+        return JsonResponse({'chart': 'assets_by_location', 'labels': labels, 'data': data, 'role': role})
+    # 5. Depreciation/Value Trend (robust, using explicit depreciation fields)
+    elif chart == 'depreciation':
+        now = timezone.now()
+        months = [(now - datetime.timedelta(days=30*i)).replace(day=1).strftime('%Y-%m') for i in reversed(range(12))]
+        month_values = {m: 0 for m in months}
+        has_value_data = False
+        for asset in qs:
+            # Only include assets with all required depreciation fields
+            if not (asset.purchase_value and asset.purchase_date and asset.useful_life_years):
+                continue
+            if asset.depreciation_method != 'straight_line':
+                continue  # Only support straight-line for now
+            purchase_value = float(asset.purchase_value)
+            purchase_date = asset.purchase_date
+            useful_life_months = asset.useful_life_years * 12
+            monthly_depreciation = purchase_value / useful_life_months
+            for m in months:
+                year, month = map(int, m.split('-'))
+                period_start = datetime.datetime(year, month, 1, tzinfo=now.tzinfo)
+                if purchase_date > period_start.date():
+                    continue  # Asset not yet acquired
+                months_elapsed = (period_start.year - purchase_date.year) * 12 + (period_start.month - purchase_date.month)
+                if months_elapsed < 0:
+                    continue
+                depreciated_value = max(purchase_value - monthly_depreciation * months_elapsed, 0)
+                # Asset cannot depreciate below zero
+                month_values[m] += depreciated_value
+                has_value_data = True
+        labels = list(month_values.keys())
+        data = list(month_values.values())
+        if not has_value_data:
+            return JsonResponse({'chart': 'depreciation_trend', 'labels': labels, 'data': [], 'role': role, 'message': 'No depreciable asset data available for trend.'})
+        return JsonResponse({'chart': 'depreciation_trend', 'labels': labels, 'data': data, 'role': role})
+    # Should not reach here due to earlier validation
+    return JsonResponse({'error': 'Invalid chart type'}, status=400)
+
+def paginate_logs(logs, request, default_size=10, max_size=50):
+    try:
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', default_size))
+        page_size = min(max(page_size, 1), max_size)
+    except Exception:
+        page = 1
+        page_size = default_size
+    paginator = Paginator(logs, page_size)
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+    return page_obj, paginator
+
+@login_required
+@require_GET
+def recent_added_assets_api(request):
+    user = request.user
+    role = getattr(user, 'role', 'user')
+    logs = AuditLog.objects.filter(action__in=['create', 'add']).order_by('-timestamp')
+    if role == 'user':
+        logs = logs.filter(user=user)
+    page_obj, paginator = paginate_logs(logs, request)
+    data = [
+        {
+            'asset_id': log.asset.id if log.asset else None,
+            'asset_name': str(log.asset) if log.asset else '',
+            'user': str(log.user) if log.user else '',
+            'timestamp': localtime(log.timestamp).strftime('%Y-%m-%d %H:%M'),
+            'details': log.details,
+        }
+        for log in page_obj
+    ]
+    return JsonResponse({'recent_added_assets': data, 'page': page_obj.number, 'num_pages': paginator.num_pages, 'total': paginator.count})
+
+@login_required
+@require_GET
+def recent_scans_api(request):
+    user = request.user
+    role = getattr(user, 'role', 'user')
+    logs = AuditLog.objects.filter(action='scan').order_by('-timestamp')
+    if role == 'user':
+        logs = logs.filter(user=user)
+    page_obj, paginator = paginate_logs(logs, request)
+    data = [
+        {
+            'asset_id': log.asset.id if log.asset else None,
+            'asset_name': str(log.asset) if log.asset else '',
+            'user': str(log.user) if log.user else '',
+            'timestamp': localtime(log.timestamp).strftime('%Y-%m-%d %H:%M'),
+            'details': log.details,
+        }
+        for log in page_obj
+    ]
+    return JsonResponse({'recent_scans': data, 'page': page_obj.number, 'num_pages': paginator.num_pages, 'total': paginator.count})
+
+@login_required
+@require_GET
+def recent_transfers_api(request):
+    user = request.user
+    role = getattr(user, 'role', 'user')
+    logs = AuditLog.objects.filter(action='assign').order_by('-timestamp')
+    if role == 'user':
+        logs = logs.filter(user=user)
+    page_obj, paginator = paginate_logs(logs, request)
+    data = [
+        {
+            'asset_id': log.asset.id if log.asset else None,
+            'asset_name': str(log.asset) if log.asset else '',
+            'from_user': str(log.user) if log.user else '',
+            'to_user': str(log.related_user) if log.related_user else '',
+            'timestamp': localtime(log.timestamp).strftime('%Y-%m-%d %H:%M'),
+            'details': log.details,
+        }
+        for log in page_obj
+    ]
+    return JsonResponse({'recent_transfers': data, 'page': page_obj.number, 'num_pages': paginator.num_pages, 'total': paginator.count})
+
+@login_required
+@require_GET
+def recent_maintenance_api(request):
+    user = request.user
+    role = getattr(user, 'role', 'user')
+    logs = AuditLog.objects.filter(action='maintenance').order_by('-timestamp')
+    if role == 'user':
+        logs = logs.filter(user=user)
+    page_obj, paginator = paginate_logs(logs, request)
+    data = [
+        {
+            'asset_id': log.asset.id if log.asset else None,
+            'asset_name': str(log.asset) if log.asset else '',
+            'user': str(log.user) if log.user else '',
+            'timestamp': localtime(log.timestamp).strftime('%Y-%m-%d %H:%M'),
+            'details': log.details,
+        }
+        for log in page_obj
+    ]
+    return JsonResponse({'recent_maintenance': data, 'page': page_obj.number, 'num_pages': paginator.num_pages, 'total': paginator.count})
+
+@login_required
+@require_GET
+def full_audit_log_api(request):
+    user = request.user
+    role = getattr(user, 'role', 'user')
+    logs = AuditLog.objects.all().order_by('-timestamp')
+    if role == 'user':
+        logs = logs.filter(user=user)
+    elif role == 'manager':
+        pass
+    action = request.GET.get('action')
+    if action:
+        logs = logs.filter(action=action)
+    asset_id = request.GET.get('asset_id')
+    if asset_id:
+        logs = logs.filter(asset__id=asset_id)
+    user_id = request.GET.get('user_id')
+    if user_id:
+        logs = logs.filter(user__id=user_id)
+    page_obj, paginator = paginate_logs(logs, request, default_size=20, max_size=100)
+    data = [
+        {
+            'id': log.id,
+            'action': log.action,
+            'asset_id': log.asset.id if log.asset else None,
+            'asset_name': str(log.asset) if log.asset else '',
+            'user': str(log.user) if log.user else '',
+            'related_user': str(log.related_user) if log.related_user else '',
+            'timestamp': localtime(log.timestamp).strftime('%Y-%m-%d %H:%M'),
+            'details': log.details,
+            'metadata': log.metadata,
+        }
+        for log in page_obj
+    ]
+    return JsonResponse({'audit_log': data, 'page': page_obj.number, 'num_pages': paginator.num_pages, 'total': paginator.count})

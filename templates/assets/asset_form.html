@@ -16,6 +16,18 @@
             {{ form.status }}
             {{ form.status.errors }}
         </div>
+        <!-- Always-required fields -->
+        <div class="col-12" id="always-required-fields">
+            <table class="table table-bordered table-sm align-middle" style="background:rgba(255,255,255,0.7);">
+                <tbody>
+                    <tr><th style="width:30%" class="text-end">Serial Number <span class="text-danger">*</span></th><td><input type="text" class="form-control" name="dyn_serial_number" id="id_dyn_serial_number" required></td></tr>
+                    <tr><th class="text-end">Model <span class="text-danger">*</span></th><td><input type="text" class="form-control" name="dyn_model" id="id_dyn_model" required></td></tr>
+                    <tr><th class="text-end">Purchase Date <span class="text-danger">*</span></th><td><input type="date" class="form-control" name="dyn_purchase_date" id="id_dyn_purchase_date" required></td></tr>
+                    <tr><th class="text-end">Condition <span class="text-danger">*</span></th><td><input type="text" class="form-control" name="dyn_condition" id="id_dyn_condition" required></td></tr>
+                    <tr><th class="text-end">Location <span class="text-danger">*</span></th><td><input type="text" class="form-control" name="dyn_location" id="id_dyn_location" required></td></tr>
+                </tbody>
+            </table>
+        </div>
         <!-- Dynamic fields placeholder -->
         <div class="col-12" id="dynamic-fields">
             <table class="table table-bordered table-sm align-middle" id="dynamic-fields-table" style="background:rgba(255,255,255,0.7);">
@@ -86,7 +98,9 @@ const dynamicDataInput = document.getElementById('id_dynamic_data');
 function renderDynamicFields(fields, values = {}) {
     const tableBody = document.querySelector('#dynamic-fields-table tbody');
     tableBody.innerHTML = '';
+    const alwaysRequired = ['serial_number', 'model', 'purchase_date', 'condition', 'location'];
     for (const [key, field] of Object.entries(fields)) {
+        if (alwaysRequired.includes(key)) continue; // Skip always-required fields
         let value = values[key] || '';
         let required = field.required ? 'required' : '';
         let label = field.label || key;
@@ -127,7 +141,7 @@ if (categoryInput) {
 const form = document.querySelector('form');
 if (form) {
     form.addEventListener('submit', function(e) {
-        const dynInputs = dynamicFieldsDiv.querySelectorAll('input');
+        const dynInputs = document.querySelectorAll('#always-required-fields input, #dynamic-fields input');
         const dynData = {};
         dynInputs.forEach(input => {
             const key = input.name.replace('dyn_', '');

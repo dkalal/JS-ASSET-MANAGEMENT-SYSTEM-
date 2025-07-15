@@ -11,6 +11,10 @@ class AuditLog(models.Model):
         ('move', 'Move'),
         ('delete', 'Delete'),
         ('create', 'Create'),
+        ('add', 'Add'),
+        ('assign', 'Assign/Transfer'),
+        ('scan', 'Scan'),
+        ('maintenance', 'Maintenance'),
         ('error', 'Error'),
         ('login', 'Login'),
         ('logout', 'Logout'),
@@ -20,6 +24,10 @@ class AuditLog(models.Model):
     asset = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     details = models.TextField(blank=True)
+    # Enterprise enhancements
+    related_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='related_audit_logs')
+    related_asset = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True, blank=True, related_name='related_audit_logs')
+    metadata = models.JSONField(default=dict, blank=True, help_text="Structured metadata for advanced filtering/grouping")
 
     def __str__(self):
         return f"{self.user} {self.action} {self.asset} at {self.timestamp}"

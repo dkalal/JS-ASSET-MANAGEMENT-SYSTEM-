@@ -1,0 +1,97 @@
+<aside class="dashboard-sidebar glass" style="display:flex;flex-direction:column;align-items:center;padding:20px 0;min-width:70px;box-shadow:0 4px 24px 0 rgba(31,38,135,0.10);">
+  <style>
+    .nav-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      margin: 8px 0;
+      border-radius: 12px;
+      transition: background 0.18s, box-shadow 0.18s;
+      color: var(--accent);
+      background: transparent;
+      box-shadow: none;
+      position: relative;
+    }
+    .nav-icon svg {
+      width: 28px;
+      height: 28px;
+      stroke: currentColor;
+      stroke-width: 1.7;
+      fill: none;
+      transition: filter 0.18s, color 0.18s;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.04));
+    }
+    .nav-icon.active, .nav-icon:hover, .nav-icon:focus {
+      background: rgba(23,107,135,0.12);
+      color: var(--primary);
+      box-shadow: 0 2px 8px 0 rgba(0,166,235,0.10);
+      outline: none;
+    }
+    .nav-icon.active::before {
+      content: '';
+      position: absolute;
+      left: -8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 32px;
+      border-radius: 2px;
+      background: linear-gradient(180deg, var(--primary), var(--accent));
+      box-shadow: 0 0 8px 2px rgba(0,166,235,0.10);
+    }
+    .nav-icon:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+  </style>
+  <a href="/dashboard/" class="nav-icon active" title="Dashboard" aria-label="Dashboard">
+    <!-- Home SVG (Glass style, bold) -->
+    <svg viewBox="0 0 24 24">
+      <path d="M4 11.5L12 5l8 6.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="6.5" y="12" width="11" height="7" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <a href="/assets/" class="nav-icon" title="Assets" aria-label="Assets">
+    <!-- Assets SVG (Stacked boxes, modern) -->
+    <svg viewBox="0 0 24 24">
+      <rect x="3" y="7" width="8" height="8" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="13" y="9" width="8" height="8" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="7" y="3" width="8" height="8" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <a href="/reports/" class="nav-icon" title="Reports" aria-label="Reports">
+    <!-- Reports SVG (Bar chart, glass style) -->
+    <svg viewBox="0 0 24 24">
+      <rect x="4" y="4" width="16" height="16" rx="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="8" y="13" width="2.5" height="3" rx="1" fill="currentColor" opacity="0.25"/>
+      <rect x="11.75" y="10" width="2.5" height="6" rx="1" fill="currentColor" opacity="0.25"/>
+      <rect x="15.5" y="7" width="2.5" height="9" rx="1" fill="currentColor" opacity="0.25"/>
+      <path d="M8 9h8" stroke-linecap="round"/>
+    </svg>
+  </a>
+  <a href="/audit/" class="nav-icon" title="Audit Logs" aria-label="Audit Logs">
+    <!-- Audit SVG (Clock, glass style) -->
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 8v4l3 2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <div style="flex:1"></div>
+  <a href="/help/" class="nav-icon" title="Help" aria-label="Help">
+    <!-- Help SVG (Question mark, glass style) -->
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 17h.01" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 13a2 2 0 1 0-2-2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+  <a href="/settings/" class="nav-icon" title="Settings" aria-label="Settings">
+    <!-- Settings SVG (Cog, glass style) -->
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </a>
+</aside>
