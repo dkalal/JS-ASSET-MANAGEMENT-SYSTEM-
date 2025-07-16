@@ -78,8 +78,21 @@ function renderActivityTable(activity) {
   `;
 }
 
+function setActivityFeedLoading(listId, colorClass) {
+    const ul = document.getElementById(listId);
+    if (!ul) {
+        console.warn(`Element with ID '${listId}' not found in DOM.`);
+        return;
+    }
+    ul.innerHTML = `<li class="text-center py-2"><span class="spinner-border spinner-border-sm ${colorClass}" role="status" aria-hidden="true"></span> Loading...</li>`;
+}
+
 function renderActivityFeed(listId, data, type) {
     const ul = document.getElementById(listId);
+    if (!ul) {
+        console.warn(`Element with ID '${listId}' not found in DOM.`);
+        return;
+    }
     ul.innerHTML = '';
     if (!data || data.length === 0) {
         const li = document.createElement('li');
