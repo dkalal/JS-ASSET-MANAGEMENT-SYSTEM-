@@ -16,30 +16,51 @@
     <div id="dashboard-widgets">
       <!-- Real-time data cards and table will be loaded here via AJAX/JS -->
     </div>
-    <section id="dashboard-activity" class="mb-5">
-      <h3 class="mb-3">Recent Activity Logs</h3>
-      <div class="glass p-3 mb-4">
-        <div class="table-responsive">
-          <table class="table table-bordered table-hover align-middle" id="activity-log-table">
-            <thead class="table-light">
-              <tr>
-                <th>User</th>
-                <th>Action</th>
-                <th>Asset</th>
-                <th>Timestamp</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody id="activity-log-tbody">
-              <!-- Rows will be loaded via JS -->
-            </tbody>
-          </table>
+    <section id="dashboard-activity-feeds" class="mb-5">
+      <h3 class="mb-3">Recent Activities</h3>
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="glass p-3 mb-4">
+            <h5>Recently Added Assets</h5>
+            <ul id="recent-added-assets" class="list-unstyled mb-0" aria-live="polite">
+              <li class="text-muted">Loading...</li>
+            </ul>
+          </div>
         </div>
-        <nav aria-label="Activity log pagination" class="d-flex justify-content-between align-items-center mt-2">
-          <button id="activity-log-prev" class="btn btn-outline-primary btn-sm" disabled>Previous</button>
-          <span id="activity-log-page-info" class="mx-2"></span>
-          <button id="activity-log-next" class="btn btn-outline-primary btn-sm" disabled>Next</button>
-        </nav>
+        <div class="col-md-6">
+          <div class="glass p-3 mb-4">
+            <h5>Recent Barcode Scans</h5>
+            <ul id="recent-scans" class="list-unstyled mb-0" aria-live="polite">
+              <li class="text-muted">Loading...</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="glass p-3 mb-4">
+            <h5>Recently Transferred/Assigned Assets</h5>
+            <ul id="recent-transfers" class="list-unstyled mb-0" aria-live="polite">
+              <li class="text-muted">Loading...</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="glass p-3 mb-4">
+            <h5>Maintenance Updates</h5>
+            <ul id="recent-maintenance" class="list-unstyled mb-0" aria-live="polite">
+              <li class="text-muted">Loading...</li>
+            </ul>
+          </div>
+        </div>
+        {% if role in 'admin manager' %}
+        <div class="col-md-12">
+          <div class="glass p-3 mb-4">
+            <h5>Audit Logs</h5>
+            <ul id="audit-log" class="list-unstyled mb-0" aria-live="polite">
+              <li class="text-muted">Loading...</li>
+            </ul>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </section>
     <section id="dashboard-charts" style="margin-top:32px;">
