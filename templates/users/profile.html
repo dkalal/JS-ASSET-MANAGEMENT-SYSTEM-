@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8 col-md-10">
+    <div class="glass p-4 mb-4">
+      <div class="d-flex align-items-center mb-4">
+        <div class="me-4">
+          {% if user_obj.profile_image %}
+            <img src="{{ user_obj.profile_image.url }}" alt="Avatar" class="rounded-circle" style="width:90px;height:90px;object-fit:cover;">
+          {% else %}
+            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center" style="width:90px;height:90px;font-size:2.5rem;color:#fff;">
+              {{ user_obj.first_name|slice:':1' }}{{ user_obj.last_name|slice:':1' }}
+            </div>
+          {% endif %}
+        </div>
+        <div>
+          <h3 class="mb-1">{{ user_obj.get_full_name|default:user_obj.username }}</h3>
+          <div class="text-muted small mb-1">{{ user_obj.email }}</div>
+          <span class="badge bg-primary">{{ user_obj.get_role_display }}</span>
+          {% if user_obj.phone_number %}<div class="text-muted small">📞 {{ user_obj.phone_number }}</div>{% endif %}
+        </div>
+        <div class="ms-auto">
+          <button class="btn btn-outline-primary" id="edit-profile-btn">Edit</button>
+        </div>
+      </div>
+      <form id="profile-form" method="post" enctype="multipart/form-data" class="row g-3 d-none">
+        {% csrf_token %}
+        <div class="col-md-6">
+          <label class="form-label">First Name</label>
+          {{ form.first_name }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Last Name</label>
+          {{ form.last_name }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Email</label>
+          {{ form.email }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Phone Number</label>
+          {{ form.phone_number }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Profile Image</label>
+          {{ form.profile_image }}
+        </div>
+        {% if user_obj.role == 'admin' %}
+        <div class="col-md-6">
+          <label class="form-label">Role</label>
+          {{ form.role }}
+        </div>
+        {% endif %}
+        <div class="col-12 d-flex justify-content-end">
+          <button type="submit" class="btn btn-success">Save</button>
+          <button type="button" class="btn btn-secondary ms-2" id="cancel-edit-profile">Cancel</button>
+        </div>
+      </form>
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} mt-3">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div class="glass p-4 mb-4">
+      <h4 class="mb-3">Assigned Assets</h4>
+      <div id="assigned-assets-table" class="min-vh-10"></div>
+    </div>
+    <div class="glass p-4 mb-4">
+      <h4 class="mb-3">Recent Activity</h4>
+      <div id="user-activity-table" class="min-vh-10"></div>
+    </div>
+    <div class="glass p-4 mb-4">
+      <h4 class="mb-3">Preferences</h4>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Theme</label>
+          <select id="theme-select" class="form-select">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Language <span class="text-muted" title="Coming soon!" style="cursor:help;">(soon)</span></label>
+          <select id="language-select" class="form-select" disabled title="Language selection coming soon!">
+            <option value="en">English</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Notifications <span class="text-muted" title="Coming soon!" style="cursor:help;">(soon)</span></label>
+          <select id="notif-select" class="form-select" disabled title="Notification preferences coming soon!">
+            <option value="email">Email</option>
+            <option value="sms">SMS</option>
+            <option value="in-app">In-App</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-2 text-muted small">Preferences are saved locally. Cross-device sync coming soon.</div>
+    </div>
+    <div class="glass p-4 mb-4">
+      <h4 class="mb-3">Security</h4>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div><strong>Last Login:</strong> {{ user_obj.last_login|date:'Y-m-d H:i' }}</div>
+        </div>
+        <div class="col-md-6">
+          <a href="{% url 'password_change' %}" class="btn btn-outline-warning btn-sm">Change Password</a>
+        </div>
+      </div>
+    </div>
+    {% if user_obj.role == 'admin' %}
+    <div class="glass p-4 mb-4">
+      <h4 class="mb-3">Role & Permissions</h4>
+      <div><strong>Current Role:</strong> {{ user_obj.get_role_display }}</div>
+      <div class="mt-2 text-muted"><em>Module and action permissions coming soon. For now, manage roles in the admin panel.</em></div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+// Edit profile logic
+const editBtn = document.getElementById('edit-profile-btn');
+const form = document.getElementById('profile-form');
+const cancelBtn = document.getElementById('cancel-edit-profile');
+if (editBtn && form && cancelBtn) {
+  editBtn.addEventListener('click', () => { form.classList.remove('d-none'); editBtn.classList.add('d-none'); });
+  cancelBtn.addEventListener('click', () => { form.classList.add('d-none'); editBtn.classList.remove('d-none'); });
+}
+// Theme preference
+const themeSelect = document.getElementById('theme-select');
+if (themeSelect) {
+  themeSelect.value = localStorage.getItem('theme') || 'light';
+  themeSelect.addEventListener('change', function() {
+    localStorage.setItem('theme', this.value);
+    document.documentElement.setAttribute('data-theme', this.value);
+  });
+}
+// Assigned assets AJAX
+function showLoading(target) {
+  document.getElementById(target).innerHTML = '<div class="d-flex align-items-center justify-content-center py-3"><div class="spinner-border text-primary me-2" role="status" aria-label="Loading"></div> <span>Loading...</span></div>';
+}
+function showError(target, msg) {
+  document.getElementById(target).innerHTML = `<div class='alert alert-danger text-center mb-0'>${msg}</div>`;
+}
+function loadAssignedAssets() {
+  showLoading('assigned-assets-table');
+  fetch('/api/user-assets/')
+    .then(res => {
+      if (!res.ok) throw new Error('Network error');
+      if (res.redirected) window.location.href = res.url;
+      return res.json();
+    })
+    .then(data => {
+      let html = '<table class="table table-bordered table-sm"><thead><tr><th>Name</th><th>Serial</th><th>Assigned</th><th>Status</th></tr></thead><tbody>';
+      if (data.assets && data.assets.length) {
+        data.assets.forEach(a => {
+          html += `<tr><td>${a.name}</td><td>${a.serial}</td><td>${a.assigned}</td><td>${a.status}</td></tr>`;
+        });
+      } else {
+        html += '<tr><td colspan="4" class="text-center">No assets assigned.</td></tr>';
+      }
+      html += '</tbody></table>';
+      document.getElementById('assigned-assets-table').innerHTML = html;
+    })
+    .catch(e => {
+      showError('assigned-assets-table', 'Unable to load assigned assets. Please log in again.');
+    });
+}
+// Activity log AJAX
+function loadUserActivity() {
+  showLoading('user-activity-table');
+  fetch('/api/user-activity/')
+    .then(res => {
+      if (!res.ok) throw new Error('Network error');
+      if (res.redirected) window.location.href = res.url;
+      return res.json();
+    })
+    .then(data => {
+      let html = '<table class="table table-bordered table-sm"><thead><tr><th>Action</th><th>Asset</th><th>Time</th><th>Details</th></tr></thead><tbody>';
+      if (data.logs && data.logs.length) {
+        data.logs.forEach(l => {
+          html += `<tr><td>${l.action}</td><td>${l.asset}</td><td>${l.time}</td><td>${l.details}</td></tr>`;
+        });
+      } else {
+        html += '<tr><td colspan="4" class="text-center">No recent activity.</td></tr>';
+      }
+      html += '</tbody></table>';
+      document.getElementById('user-activity-table').innerHTML = html;
+    })
+    .catch(e => {
+      showError('user-activity-table', 'Unable to load recent activity. Please log in again.');
+    });
+}
+document.addEventListener('DOMContentLoaded', function() {
+  loadAssignedAssets();
+  loadUserActivity();
+});
+</script>
+{% endblock %} 

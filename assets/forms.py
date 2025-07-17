@@ -1,16 +1,52 @@
 from django import forms
-from .models import Asset
+from .models import Asset, AssetCategory, AssetCategoryField
 from django.core.exceptions import ValidationError
-from django.http import QueryDict
+from django.apps import apps
 import json
 
 class AssetForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop('request', None)
+        # Get category from POST, GET, or initial
+        category_id = None
+        if 'data' in kwargs and kwargs['data']:
+            category_id = kwargs['data'].get('category')
+        if not category_id and 'initial' in kwargs and kwargs['initial']:
+            category_id = kwargs['initial'].get('category')
+        super().__init__(*args, **kwargs)
+        # Add dynamic fields from category
+        self.dynamic_field_names = []
+        AssetCategoryModel = apps.get_model('assets', 'AssetCategory')
+        AssetCategoryFieldModel = apps.get_model('assets', 'AssetCategoryField')
+        if category_id:
+            try:
+                category = AssetCategoryModel.objects.get(pk=category_id)
+                for f in AssetCategoryFieldModel.objects.filter(category=category):
+                    fname = f"dyn_{f.key}"
+                    # Force all dynamic fields to be optional
+                    self.fields[fname] = self._make_field({'key': f.key, 'label': f.label, 'type': f.type, 'required': False})
+                    self.dynamic_field_names.append(fname)
+            except AssetCategoryModel.DoesNotExist:
+                pass
+
+    def _make_field(self, field):
+        label = field['label']
+        required = False  # Force all dynamic fields to be optional
+        if field['type'] == 'text':
+            return forms.CharField(label=label, required=required, widget=forms.TextInput(attrs={'class': 'form-control'}))
+        elif field['type'] == 'number':
+            return forms.DecimalField(label=label, required=required, widget=forms.NumberInput(attrs={'class': 'form-control'}))
+        elif field['type'] == 'date':
+            return forms.DateField(label=label, required=required, widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+        else:
+            return forms.CharField(label=label, required=required, widget=forms.TextInput(attrs={'class': 'form-control'}))
+
     class Meta:
         model = Asset
         fields = [
             'category', 'status', 'assigned_to', 'description',
             'purchase_value', 'purchase_date', 'depreciation_method', 'useful_life_years',
-            'qr_code', 'images', 'documents', 'dynamic_data'
+            'qr_code', 'images', 'documents'
         ]
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
@@ -36,27 +72,24 @@ class AssetForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        # Validate always-required dynamic fields
-        dyn_data = self.data.get('dynamic_data')
-        import json
-        if isinstance(dyn_data, list):
-            dyn_data = dyn_data[0] if dyn_data else '{}'
-        try:
-            dyn_data = json.loads(dyn_data) if dyn_data else {}
-        except Exception:
-            dyn_data = {}
-        required_keys = ['serial_number', 'model', 'purchase_date', 'condition', 'location']
-        missing = [k for k in required_keys if not dyn_data.get(k)]
-        if missing:
-            from django.core.exceptions import ValidationError
-            raise ValidationError(f"Missing required fields: {', '.join(missing)}")
+        # Assemble dynamic_data from dyn_* fields
+        dynamic_data = {}
+        for fname in self.dynamic_field_names:
+            key = fname.replace('dyn_', '')
+            value = self.cleaned_data.get(fname)
+            # Convert date objects to ISO string for JSON serialization
+            import datetime
+            if isinstance(value, (datetime.date, datetime.datetime)):
+                value = value.isoformat()
+            dynamic_data[key] = value
+        # No required field validation for dynamic fields
+        cleaned_data['dynamic_data'] = dynamic_data
         # Depreciation validation
         purchase_value = cleaned_data.get('purchase_value')
         purchase_date = cleaned_data.get('purchase_date')
         useful_life_years = cleaned_data.get('useful_life_years')
         depreciation_method = cleaned_data.get('depreciation_method')
         if purchase_value or purchase_date or useful_life_years:
-            # If any depreciation field is set, require all
             if not (purchase_value and purchase_date and useful_life_years and depreciation_method):
                 raise forms.ValidationError('All depreciation fields (value, date, method, useful life) are required for depreciable assets.')
             if purchase_value <= 0:
@@ -67,13 +100,7 @@ class AssetForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        # Handle dynamic fields from hidden input
-        request = self.initial.get('request')
-        if request:
-            dyn_data = request.POST.get('dynamic_data')
-            if dyn_data:
-                import json
-                instance.dynamic_data = json.loads(dyn_data)
+        instance.dynamic_data = self.cleaned_data.get('dynamic_data', {})
         if commit:
             instance.save()
             self.save_m2m()

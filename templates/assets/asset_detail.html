@@ -2,6 +2,12 @@
 {% load asset_extras %}
 {% block title %}Asset Details{% endblock %}
 {% block content %}
+{% if not user.is_authenticated %}
+  <div class="d-flex align-items-center justify-content-center mb-4">
+    <img src="/static/img/logo.png" alt="Logo" style="height:48px; margin-right:16px;">
+    <h2 class="mb-0" style="color:#176B87; font-weight:bold;">Asset Details</h2>
+  </div>
+{% endif %}
 <h2 class="mb-4">Asset Details {% if accessed_by_uuid %}<span class="badge bg-success">Accessed by UUID</span>{% endif %}</h2>
 <div class="row">
     <div class="col-md-6">
@@ -46,6 +52,8 @@
         {% endif %}
     </div>
 </div>
+{% if user.is_authenticated %}
 <a href="{% url 'asset_list' %}" class="btn btn-secondary mt-4">Back to List</a>
+{% endif %}
 {% endblock %}
 {% comment %} Add this filter in your template tags: @register.filter def get_item(dictionary, key): return dictionary.get(key) {% endcomment %} 

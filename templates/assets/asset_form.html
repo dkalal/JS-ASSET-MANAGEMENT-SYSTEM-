@@ -1,7 +1,25 @@
 {% extends 'base.html' %}
+{% load asset_extras %}
 {% block title %}Register Asset{% endblock %}
 {% block content %}
 <h2 class="mb-4">Register New Asset</h2>
+<!-- Robust error display block -->
+{% if form.errors %}
+  <div class="alert alert-danger">
+    <strong>There were errors in your submission. Please correct them below.</strong>
+    <ul class="mb-0">
+      {% for field in form %}
+        {% for error in field.errors %}
+          <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+        {% endfor %}
+      {% endfor %}
+      {% for error in form.non_field_errors %}
+        <li>{{ error }}</li>
+      {% endfor %}
+    </ul>
+    <pre style="font-size:0.9em; color:#333; background:#f8f9fa; border-radius:6px; padding:8px; margin-top:8px;">{{ form.errors.as_json }}</pre>
+  </div>
+{% endif %}
 <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
     {% csrf_token %}
     {{ form.non_field_errors }}
@@ -16,27 +34,10 @@
             {{ form.status }}
             {{ form.status.errors }}
         </div>
-        <!-- Always-required fields -->
-        <div class="col-12" id="always-required-fields">
-            <table class="table table-bordered table-sm align-middle" style="background:rgba(255,255,255,0.7);">
-                <tbody>
-                    <tr><th style="width:30%" class="text-end">Serial Number <span class="text-danger">*</span></th><td><input type="text" class="form-control" name="dyn_serial_number" id="id_dyn_serial_number" required></td></tr>
-                    <tr><th class="text-end">Model <span class="text-danger">*</span></th><td><input type="text" class="form-control" name="dyn_model" id="id_dyn_model" required></td></tr>
-                    <tr><th class="text-end">Purchase Date <span class="text-danger">*</span></th><td><input type="date" class="form-control" name="dyn_purchase_date" id="id_dyn_purchase_date" required></td></tr>
-                    <tr><th class="text-end">Condition <span class="text-danger">*</span></th><td><input type="text" class="form-control" name="dyn_condition" id="id_dyn_condition" required></td></tr>
-                    <tr><th class="text-end">Location <span class="text-danger">*</span></th><td><input type="text" class="form-control" name="dyn_location" id="id_dyn_location" required></td></tr>
-                </tbody>
-            </table>
-        </div>
         <!-- Dynamic fields placeholder -->
-        <div class="col-12" id="dynamic-fields">
-            <table class="table table-bordered table-sm align-middle" id="dynamic-fields-table" style="background:rgba(255,255,255,0.7);">
-                <tbody>
-                <!-- Dynamic fields will be rendered here via JS/AJAX based on category -->
-                </tbody>
-            </table>
+        <div class="col-12" id="dynamic-fields-container">
+            <!-- Dynamic fields will be rendered here by JS -->
         </div>
-        <input type="hidden" name="dynamic_data" id="id_dynamic_data">
         <div class="col-12">
             <label for="id_description" class="form-label">Description</label>
             {{ form.description }}
@@ -44,7 +45,16 @@
         </div>
         <div class="col-md-6">
             <label for="id_assigned_to" class="form-label">Assigned To</label>
-            {{ form.assigned_to }}
+            <div class="input-group">
+                <select name="assigned_to" id="id_assigned_to" class="form-select">
+                    {% for option in form.assigned_to.field.choices %}
+                        <option value="{{ option.0 }}" {% if form.assigned_to.value == option.0 %}selected{% endif %}>{{ option.1 }}</option>
+                    {% endfor %}
+                </select>
+                {% if user_role == 'admin' %}
+                <button type="button" class="btn btn-outline-success" id="openAddUserModal" type="button">Add User</button>
+                {% endif %}
+            </div>
             {{ form.assigned_to.errors }}
         </div>
         <div class="col-md-6">
@@ -58,6 +68,37 @@
             {{ form.documents }}
             {{ form.documents.errors }}
         </div>
+        <!-- Depreciation Details -->
+        <div class="col-12">
+            <div class="card mb-3">
+                <div class="card-header bg-warning text-dark">Depreciation Details</div>
+                <div class="card-body row g-3">
+                    <div class="col-md-3">
+                        <label for="id_purchase_value" class="form-label">Purchase Value</label>
+                        {{ form.purchase_value }}
+                        {{ form.purchase_value.errors }}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_purchase_date" class="form-label">Purchase Date</label>
+                        {{ form.purchase_date }}
+                        {{ form.purchase_date.errors }}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_depreciation_method" class="form-label">Depreciation Method</label>
+                        {{ form.depreciation_method }}
+                        {{ form.depreciation_method.errors }}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_useful_life_years" class="form-label">Useful Life (Years)</label>
+                        {{ form.useful_life_years }}
+                        {{ form.useful_life_years.errors }}
+                    </div>
+                </div>
+                <div class="card-footer small text-muted">
+                    All fields above are required for depreciable assets. Leave blank if not applicable.
+                </div>
+            </div>
+        </div>
     </div>
     <div class="mt-4">
         <button type="submit" class="btn btn-primary">Register Asset</button>
@@ -70,6 +111,92 @@
     <div class="mt-2">
         <a href="{{ object.qr_code.url }}" download class="btn btn-outline-secondary btn-sm">Download QR</a>
     </div>
+</div>
+{% endif %}
+
+<!-- Custom Add User Modal (Admin Only) -->
+{% if user_role == 'admin' %}
+<style>
+.custom-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.5);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+}
+.custom-modal-overlay.active {
+  display: flex;
+}
+.custom-modal {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37);
+  padding: 0;
+  overflow: hidden;
+}
+.custom-modal-header {
+  background: #00A6EB;
+  color: #fff;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.custom-modal-body {
+  padding: 1.5rem;
+}
+.custom-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #fff;
+  cursor: pointer;
+}
+</style>
+<div id="addUserModalCustom" class="custom-modal-overlay" tabindex="-1">
+  <div class="custom-modal" role="dialog" aria-modal="true" aria-labelledby="addUserModalCustomLabel">
+    <div class="custom-modal-header">
+      <h5 class="modal-title" id="addUserModalCustomLabel">Add New User</h5>
+      <button type="button" class="custom-modal-close" id="closeAddUserModal" aria-label="Close">&times;</button>
+    </div>
+    <div class="custom-modal-body">
+      <form id="add-user-form">
+        <div class="mb-3">
+          <label for="new-username" class="form-label">Username</label>
+          <input type="text" class="form-control" id="new-username" name="username" required autocomplete="off">
+        </div>
+        <div class="mb-3">
+          <label for="new-email" class="form-label">Email</label>
+          <input type="email" class="form-control" id="new-email" name="email" required autocomplete="off">
+        </div>
+        <div class="mb-3">
+          <label for="new-role" class="form-label">Role</label>
+          <select class="form-select" id="new-role" name="role" required>
+            <option value="user">User</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label for="new-password1" class="form-label">Password</label>
+          <input type="password" class="form-control" id="new-password1" name="password1" required>
+        </div>
+        <div class="mb-3">
+          <label for="new-password2" class="form-label">Confirm Password</label>
+          <input type="password" class="form-control" id="new-password2" name="password2" required>
+        </div>
+        <div id="add-user-errors" class="alert alert-danger d-none"></div>
+        <div id="add-user-success" class="alert alert-success d-none"></div>
+        <div class="d-flex justify-content-end">
+          <button type="submit" class="btn btn-success">Create User</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 {% endif %}
 {% endblock %}
@@ -90,65 +217,158 @@ if (imageInput) {
     });
 }
 
-// Dynamic fields logic
-const categoryInput = document.getElementById('id_category');
-const dynamicFieldsDiv = document.getElementById('dynamic-fields');
-const dynamicDataInput = document.getElementById('id_dynamic_data');
+// --- Dynamic Fields AJAX Logic ---
+const categorySelect = document.getElementById('id_category');
+const dynamicFieldsContainer = document.getElementById('dynamic-fields-container');
 
-function renderDynamicFields(fields, values = {}) {
-    const tableBody = document.querySelector('#dynamic-fields-table tbody');
-    tableBody.innerHTML = '';
-    const alwaysRequired = ['serial_number', 'model', 'purchase_date', 'condition', 'location'];
+function sanitizeHTML(str) {
+    const temp = document.createElement('div');
+    temp.textContent = str;
+    return temp.innerHTML;
+}
+
+function showDynamicFieldsLoading() {
+    dynamicFieldsContainer.innerHTML = '<div class="d-flex align-items-center justify-content-center py-3"><div class="spinner-border text-primary me-2" role="status" aria-label="Loading"></div> <span>Loading fields...</span></div>';
+}
+
+function renderDynamicFields(fields) {
+    if (!fields || Object.keys(fields).length === 0) {
+        dynamicFieldsContainer.innerHTML = '<div class="alert alert-info mb-0">No additional fields for this category.</div>';
+        return;
+    }
+    let html = '<div class="card mb-3"><div class="card-header bg-info text-dark">Category Fields</div><div class="card-body p-0"><table class="table table-bordered table-sm align-middle mb-0" style="background:rgba(255,255,255,0.7);"><tbody>';
     for (const [key, field] of Object.entries(fields)) {
-        if (alwaysRequired.includes(key)) continue; // Skip always-required fields
-        let value = values[key] || '';
-        let required = field.required ? 'required' : '';
-        let label = field.label || key;
-        let inputHtml = '';
+        const fieldId = `id_dyn_${sanitizeHTML(key)}`;
+        const required = field.required ? 'required' : '';
+        const requiredMark = field.required ? ' <span class="text-danger">*</span>' : '';
+        let input = '';
         if (field.type === 'text') {
-            inputHtml = `<input type='text' class='form-control' name='dyn_${key}' id='id_dyn_${key}' value='${value}' ${required}>`;
+            input = `<input type="text" name="dyn_${sanitizeHTML(key)}" id="${fieldId}" class="form-control" ${required} autocomplete="off">`;
         } else if (field.type === 'number') {
-            inputHtml = `<input type='number' class='form-control' name='dyn_${key}' id='id_dyn_${key}' value='${value}' ${required}>`;
+            input = `<input type="number" name="dyn_${sanitizeHTML(key)}" id="${fieldId}" class="form-control" ${required} step="any" autocomplete="off">`;
         } else if (field.type === 'date') {
-            inputHtml = `<input type='date' class='form-control' name='dyn_${key}' id='id_dyn_${key}' value='${value}' ${required}>`;
+            input = `<input type="date" name="dyn_${sanitizeHTML(key)}" id="${fieldId}" class="form-control" ${required} autocomplete="off">`;
+        } else {
+            input = `<input type="text" name="dyn_${sanitizeHTML(key)}" id="${fieldId}" class="form-control" ${required} autocomplete="off">`;
         }
-        tableBody.innerHTML += `<tr><th style='width:30%' class='text-end'>${label}${field.required ? ' <span class="text-danger">*</span>' : ''}</th><td>${inputHtml}</td></tr>`;
+        html += `<tr><th style="width:30%" class="text-end">${sanitizeHTML(field.label)}${requiredMark}</th><td>${input}</td></tr>`;
     }
+    html += '</tbody></table></div></div>';
+    dynamicFieldsContainer.innerHTML = html;
 }
 
-async function fetchDynamicFields(categoryId) {
-    if (!categoryId) { dynamicFieldsDiv.innerHTML = ''; return; }
-    const res = await fetch(`/api/dynamic-fields/?category_id=${categoryId}`);
-    const data = await res.json();
-    if (data.success) {
-        renderDynamicFields(data.fields);
-    } else {
-        dynamicFieldsDiv.innerHTML = '';
+function fetchAndRenderDynamicFields(categoryId) {
+    if (!categoryId) {
+        dynamicFieldsContainer.innerHTML = '';
+        return;
     }
-}
-
-if (categoryInput) {
-    categoryInput.addEventListener('change', function() {
-        fetchDynamicFields(this.value);
-    });
-    // Initial load (for edit forms)
-    if (categoryInput.value) {
-        fetchDynamicFields(categoryInput.value);
-    }
-}
-
-// On form submit, collect dynamic field values into hidden input
-const form = document.querySelector('form');
-if (form) {
-    form.addEventListener('submit', function(e) {
-        const dynInputs = document.querySelectorAll('#always-required-fields input, #dynamic-fields input');
-        const dynData = {};
-        dynInputs.forEach(input => {
-            const key = input.name.replace('dyn_', '');
-            dynData[key] = input.value;
+    showDynamicFieldsLoading();
+    fetch(`/api/dynamic-fields/?category_id=${encodeURIComponent(categoryId)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                renderDynamicFields(data.fields);
+            } else {
+                dynamicFieldsContainer.innerHTML = '<div class="alert alert-warning mb-0">No fields found for this category.</div>';
+            }
+        })
+        .catch(() => {
+            dynamicFieldsContainer.innerHTML = '<div class="alert alert-danger mb-0">Error loading fields. Please try again.</div>';
         });
-        dynamicDataInput.value = JSON.stringify(dynData);
+}
+
+if (categorySelect) {
+    // Initial load (for edit forms)
+    if (categorySelect.value) {
+        fetchAndRenderDynamicFields(categorySelect.value);
+    }
+    categorySelect.addEventListener('change', function() {
+        fetchAndRenderDynamicFields(this.value);
     });
 }
+
+// --- Assigned To: Searchable Dropdown (simple, native) ---
+(function() {
+    const assignedTo = document.getElementById('id_assigned_to');
+    if (assignedTo) {
+        assignedTo.setAttribute('autocomplete', 'off');
+        // Optionally, implement a search/filter for large user lists
+    }
+})();
+
+// --- Custom Add User Modal Logic (Admin Only) ---
+{% if user_role == 'admin' %}
+const openAddUserModalBtn = document.getElementById('openAddUserModal');
+const addUserModalCustom = document.getElementById('addUserModalCustom');
+const closeAddUserModalBtn = document.getElementById('closeAddUserModal');
+openAddUserModalBtn.addEventListener('click', () => {
+  addUserModalCustom.classList.add('active');
+  addUserModalCustom.focus();
+});
+closeAddUserModalBtn.addEventListener('click', () => {
+  addUserModalCustom.classList.remove('active');
+});
+addUserModalCustom.addEventListener('click', (e) => {
+  if (e.target === addUserModalCustom) {
+    addUserModalCustom.classList.remove('active');
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && addUserModalCustom.classList.contains('active')) {
+    addUserModalCustom.classList.remove('active');
+  }
+});
+const addUserForm = document.getElementById('add-user-form');
+const addUserErrors = document.getElementById('add-user-errors');
+const addUserSuccess = document.getElementById('add-user-success');
+addUserForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    addUserErrors.classList.add('d-none');
+    addUserSuccess.classList.add('d-none');
+    const formData = new FormData(addUserForm);
+    fetch('/api/create-user/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            addUserSuccess.textContent = 'User created successfully!';
+            addUserSuccess.classList.remove('d-none');
+            // Add new user to dropdown
+            const assignedTo = document.getElementById('id_assigned_to');
+            const opt = document.createElement('option');
+            opt.value = data.user.id;
+            opt.textContent = data.user.display;
+            assignedTo.appendChild(opt);
+            assignedTo.value = data.user.id;
+            // Close modal after short delay
+            setTimeout(() => {
+                addUserModalCustom.classList.remove('active');
+                addUserForm.reset();
+                addUserSuccess.classList.add('d-none');
+            }, 1200);
+        } else {
+            let errMsg = '';
+            if (data.errors) {
+                for (const [field, errs] of Object.entries(data.errors)) {
+                    errMsg += `<strong>${sanitizeHTML(field)}:</strong> ${sanitizeHTML(errs.join(' '))}<br>`;
+                }
+            } else {
+                errMsg = 'Unknown error.';
+            }
+            addUserErrors.innerHTML = errMsg;
+            addUserErrors.classList.remove('d-none');
+        }
+    })
+    .catch(() => {
+        addUserErrors.textContent = 'Error creating user. Please try again.';
+        addUserErrors.classList.remove('d-none');
+    });
+});
+{% endif %}
 </script>
 {% endblock %} 

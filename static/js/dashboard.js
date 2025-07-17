@@ -78,76 +78,164 @@ function renderActivityTable(activity) {
   `;
 }
 
-function renderActivityFeed(listId, data, type) {
+function sanitizeHTML(str) {
+    const temp = document.createElement('div');
+    temp.textContent = str;
+    return temp.innerHTML;
+}
+
+function setLoading(listId) {
     const ul = document.getElementById(listId);
+    if (ul) {
+        ul.innerHTML = '<li class="list-group-item text-center text-muted"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...</li>';
+    }
+}
+
+// Pagination state for each feed
+const feedPagination = {
+    'recent-added-assets': { page: 1, numPages: 1 },
+    'recent-scans': { page: 1, numPages: 1 },
+    'recent-transfers': { page: 1, numPages: 1 },
+    'recent-maintenance': { page: 1, numPages: 1 },
+    'audit-log': { page: 1, numPages: 1 }
+};
+
+function renderActivityFeed(listId, data, type, page, numPages, total) {
+    const ul = document.getElementById(listId);
+    if (!ul) {
+        console.warn(`Element with id '${listId}' not found in DOM.`);
+        return;
+    }
     ul.innerHTML = '';
     if (!data || data.length === 0) {
         const li = document.createElement('li');
-        li.className = 'text-muted text-center py-2';
-        li.innerHTML = `<i class='bi bi-info-circle me-2'></i>No recent ${type}.`;
+        li.className = 'list-group-item text-muted text-center py-2';
+        li.innerHTML = `<i class='bi bi-info-circle me-2'></i>No recent ${sanitizeHTML(type)}.`;
         ul.appendChild(li);
-        return;
+    } else {
+        data.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item activity-item py-2 border-bottom';
+            let icon = '';
+            let main = '';
+            let details = '';
+            switch (type) {
+                case 'added assets':
+                    icon = "<i class='bi bi-plus-circle text-success me-2'></i>";
+                    main = `<strong>${sanitizeHTML(item.asset_name || 'Asset')}</strong>`;
+                    details = `by <span class='text-primary'>${sanitizeHTML(item.user)}</span> on <span class='text-secondary'>${sanitizeHTML(item.timestamp)}</span>`;
+                    break;
+                case 'scans':
+                    icon = "<i class='bi bi-upc-scan text-info me-2'></i>";
+                    main = `<strong>${sanitizeHTML(item.asset_name || 'Asset')}</strong>`;
+                    details = `scanned by <span class='text-primary'>${sanitizeHTML(item.user)}</span> on <span class='text-secondary'>${sanitizeHTML(item.timestamp)}</span>`;
+                    break;
+                case 'transfers':
+                    icon = "<i class='bi bi-arrow-left-right text-warning me-2'></i>";
+                    main = `<strong>${sanitizeHTML(item.asset_name || 'Asset')}</strong>`;
+                    details = `from <span class='text-primary'>${sanitizeHTML(item.from_user)}</span> to <span class='text-success'>${sanitizeHTML(item.to_user)}</span> on <span class='text-secondary'>${sanitizeHTML(item.timestamp)}</span>`;
+                    break;
+                case 'maintenance':
+                    icon = "<i class='bi bi-tools text-danger me-2'></i>";
+                    main = `<strong>${sanitizeHTML(item.asset_name || 'Asset')}</strong>`;
+                    details = `by <span class='text-primary'>${sanitizeHTML(item.user)}</span> on <span class='text-secondary'>${sanitizeHTML(item.timestamp)}</span>`;
+                    break;
+                case 'audit log':
+                    icon = "<i class='bi bi-clipboard-data text-secondary me-2'></i>";
+                    main = `<strong>${sanitizeHTML(item.action)}</strong> - <span>${sanitizeHTML(item.asset_name || '')}</span>`;
+                    details = `by <span class='text-primary'>${sanitizeHTML(item.user)}</span> on <span class='text-secondary'>${sanitizeHTML(item.timestamp)}</span>`;
+                    break;
+            }
+            li.innerHTML = `${icon} ${main}<br><small>${details}</small>`;
+            if (item.asset_id) {
+                li.innerHTML = `<a href="/assets/${encodeURIComponent(item.asset_id)}/" class="text-decoration-none">${li.innerHTML}</a>`;
+            }
+            ul.appendChild(li);
+        });
     }
-    data.forEach(item => {
-        const li = document.createElement('li');
-        li.className = 'activity-item py-2 border-bottom';
-        let icon = '';
-        let main = '';
-        let details = '';
-        switch (type) {
-            case 'added assets':
-                icon = "<i class='bi bi-plus-circle text-success me-2'></i>";
-                main = `<strong>${item.asset_name || 'Asset'}</strong>`;
-                details = `by <span class='text-primary'>${item.user}</span> on <span class='text-secondary'>${item.timestamp}</span>`;
-                break;
-            case 'scans':
-                icon = "<i class='bi bi-upc-scan text-info me-2'></i>";
-                main = `<strong>${item.asset_name || 'Asset'}</strong>`;
-                details = `scanned by <span class='text-primary'>${item.user}</span> on <span class='text-secondary'>${item.timestamp}</span>`;
-                break;
-            case 'transfers':
-                icon = "<i class='bi bi-arrow-left-right text-warning me-2'></i>";
-                main = `<strong>${item.asset_name || 'Asset'}</strong>`;
-                details = `from <span class='text-primary'>${item.from_user}</span> to <span class='text-success'>${item.to_user}</span> on <span class='text-secondary'>${item.timestamp}</span>`;
-                break;
-            case 'maintenance':
-                icon = "<i class='bi bi-tools text-danger me-2'></i>";
-                main = `<strong>${item.asset_name || 'Asset'}</strong>`;
-                details = `by <span class='text-primary'>${item.user}</span> on <span class='text-secondary'>${item.timestamp}</span>`;
-                break;
-            case 'audit log':
-                icon = "<i class='bi bi-clipboard-data text-secondary me-2'></i>";
-                main = `<strong>${item.action}</strong> - <span>${item.asset_name || ''}</span>`;
-                details = `by <span class='text-primary'>${item.user}</span> on <span class='text-secondary'>${item.timestamp}</span>`;
-                break;
+    // Update pagination controls
+    const prevBtn = document.getElementById(`${listId}-prev`);
+    const nextBtn = document.getElementById(`${listId}-next`);
+    const pageInfo = document.getElementById(`${listId}-page-info`);
+    if (prevBtn && nextBtn && pageInfo) {
+        prevBtn.disabled = page <= 1;
+        nextBtn.disabled = page >= numPages;
+        pageInfo.textContent = `Page ${page} of ${numPages} (${total} total)`;
+    }
+    // Update state
+    feedPagination[listId].page = page;
+    feedPagination[listId].numPages = numPages;
+}
+
+function fetchAndRenderActivityFeed(feed) {
+    let url, type, dataKey;
+    const pageSize = 5;
+    switch (feed) {
+        case 'recent-added-assets':
+            url = `/recent-added-assets-api/?page=${feedPagination[feed].page}&page_size=${pageSize}`;
+            type = 'added assets';
+            dataKey = 'recent_added_assets';
+            break;
+        case 'recent-scans':
+            url = `/recent-scans-api/?page=${feedPagination[feed].page}&page_size=${pageSize}`;
+            type = 'scans';
+            dataKey = 'recent_scans';
+            break;
+        case 'recent-transfers':
+            url = `/recent-transfers-api/?page=${feedPagination[feed].page}&page_size=${pageSize}`;
+            type = 'transfers';
+            dataKey = 'recent_transfers';
+            break;
+        case 'recent-maintenance':
+            url = `/recent-maintenance-api/?page=${feedPagination[feed].page}&page_size=${pageSize}`;
+            type = 'maintenance';
+            dataKey = 'recent_maintenance';
+            break;
+        case 'audit-log':
+            url = `/full-audit-log-api/?page=${feedPagination[feed].page}&page_size=${pageSize}`;
+            type = 'audit log';
+            dataKey = 'audit_log';
+            break;
+        default:
+            return;
+    }
+    setLoading(feed);
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            renderActivityFeed(feed, data[dataKey], type, data.page, data.num_pages, data.total);
+        });
+}
+
+function setupFeedPagination() {
+    const feeds = ['recent-added-assets', 'recent-scans', 'recent-transfers', 'recent-maintenance', 'audit-log'];
+    feeds.forEach(feed => {
+        const prevBtn = document.getElementById(`${feed}-prev`);
+        const nextBtn = document.getElementById(`${feed}-next`);
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                if (feedPagination[feed].page > 1) {
+                    feedPagination[feed].page--;
+                    fetchAndRenderActivityFeed(feed);
+                }
+            });
         }
-        li.innerHTML = `${icon} ${main}<br><small>${details}</small>`;
-        if (item.asset_id) {
-            li.innerHTML = `<a href="/assets/${item.asset_id}/" class="text-decoration-none">${li.innerHTML}</a>`;
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                if (feedPagination[feed].page < feedPagination[feed].numPages) {
+                    feedPagination[feed].page++;
+                    fetchAndRenderActivityFeed(feed);
+                }
+            });
         }
-        ul.appendChild(li);
     });
 }
 
-function fetchAndRenderActivityFeeds() {
-    fetch('/recent-added-assets-api/').then(res => res.json()).then(data => {
-        renderActivityFeed('recent-added-assets', data.recent_added_assets, 'added assets');
+function fetchAndRenderAllActivityFeeds() {
+    const feeds = ['recent-added-assets', 'recent-scans', 'recent-transfers', 'recent-maintenance', 'audit-log'];
+    feeds.forEach(feed => {
+        fetchAndRenderActivityFeed(feed);
     });
-    fetch('/recent-scans-api/').then(res => res.json()).then(data => {
-        renderActivityFeed('recent-scans', data.recent_scans, 'scans');
-    });
-    fetch('/recent-transfers-api/').then(res => res.json()).then(data => {
-        renderActivityFeed('recent-transfers', data.recent_transfers, 'transfers');
-    });
-    fetch('/recent-maintenance-api/').then(res => res.json()).then(data => {
-        renderActivityFeed('recent-maintenance', data.recent_maintenance, 'maintenance');
-    });
-    const auditLogUl = document.getElementById('audit-log');
-    if (auditLogUl) {
-        fetch('/full-audit-log-api/').then(res => res.json()).then(data => {
-            renderActivityFeed('audit-log', data.audit_log, 'audit log');
-        });
-    }
 }
 
 function loadDashboardData() {
@@ -321,8 +409,15 @@ document.addEventListener('DOMContentLoaded', function() {
   // Dropdowns, tooltips, etc. (future)
   loadDashboardData();
   renderDashboardCharts();
-  fetchAndRenderActivityFeeds();
+  // Show loading indicators before fetching
+  setLoading('recent-added-assets');
+  setLoading('recent-scans');
+  setLoading('recent-transfers');
+  setLoading('recent-maintenance');
+  setLoading('audit-log');
+  fetchAndRenderAllActivityFeeds();
   fetchAndRenderActivityLogTable();
+  setupFeedPagination();
   document.getElementById('activity-log-prev').addEventListener('click', function() {
         if (window._activityLogCurrentPage > 1) {
             fetchAndRenderActivityLogTable(window._activityLogCurrentPage - 1);

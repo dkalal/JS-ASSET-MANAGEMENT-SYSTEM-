@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from .models import AssetCategory, Asset, AssetCategoryField
 from django.forms.models import BaseInlineFormSet
 from import_export import resources
@@ -18,25 +18,8 @@ class AssetCategoryAdmin(admin.ModelAdmin):
 
     def save_formset(self, request, form, formset, change):
         super().save_formset(request, form, formset, change)
-        # Ensure required dynamic fields exist
+        # Only update dynamic_fields JSON, do not auto-add any fields
         category = form.instance
-        required_fields = [
-            {'key': 'serial_number', 'label': 'Serial Number', 'type': 'text'},
-            {'key': 'model', 'label': 'Model', 'type': 'text'},
-            {'key': 'purchase_date', 'label': 'Purchase Date', 'type': 'date'},
-            {'key': 'condition', 'label': 'Condition', 'type': 'text'},
-            {'key': 'location', 'label': 'Location', 'type': 'text'},
-        ]
-        for field in required_fields:
-            if not category.fields.filter(key=field['key']).exists():
-                AssetCategoryField.objects.create(
-                    category=category,
-                    key=field['key'],
-                    label=field['label'],
-                    type=field['type'],
-                    required=True
-                )
-        # After saving fields, update dynamic_fields JSON
         fields = category.fields.all()
         schema = {}
         for f in fields:
@@ -77,3 +60,14 @@ class AssetAdmin(ImportExportModelAdmin):
         # TODO: Implement PDF export with branding
         self.message_user(request, 'PDF export coming soon!')
     export_as_pdf.short_description = 'Export selected as PDF'
+
+@admin.register(AssetCategoryField)
+class AssetCategoryFieldAdmin(admin.ModelAdmin):
+    list_display = ('category', 'key', 'label', 'type', 'required')
+    actions = ['delete_selected_fields']
+
+    def delete_selected_fields(self, request, queryset):
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(request, f"Successfully deleted {count} field(s).", messages.SUCCESS)
+    delete_selected_fields.short_description = "Delete selected fields (no related objects)"

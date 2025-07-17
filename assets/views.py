@@ -57,13 +57,26 @@ class AssetCreateView(CreateView):
         asset.qr_code.save(f"asset_{asset.uuid}.png", ContentFile(buffer.getvalue()), save=False)
         asset.save()
         log_audit(self.request.user, 'create', asset, 'Asset created via dashboard')
+        messages.success(self.request, f"Asset '{asset}' registered successfully.")
+        print(f"[DEBUG] Asset created: {asset}")
         return super().form_valid(form)
+
+    def form_invalid(self, form):
+        print(f"[DEBUG] Asset registration form invalid: {form.errors}")
+        messages.error(self.request, "Asset registration failed. Please correct the errors below.")
+        return super().form_invalid(form)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['initial'] = kwargs.get('initial', {})
         kwargs['initial']['request'] = self.request
+        kwargs['request'] = self.request
         return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['user_role'] = getattr(self.request.user, 'role', 'user')
+        return context
 
 asset_create = user_passes_test(is_admin_or_manager, login_url='login')(AssetCreateView.as_view())
 
@@ -76,7 +89,8 @@ def get_dynamic_fields(request):
     except AssetCategory.DoesNotExist:
         return JsonResponse({'success': False, 'fields': {}})
 
-class AssetListView(ListView):
+# Asset list view: only for authenticated users
+class AssetListView(LoginRequiredMixin, ListView):
     model = Asset
     template_name = 'assets/asset_list.html'
     context_object_name = 'assets'
@@ -113,7 +127,14 @@ class AssetListView(ListView):
                         except ValueError:
                             pass
                     elif field.type == 'date':
-                        qs = qs.filter(**{f'dynamic_data__{field.key}': val})
+                        # Parse mm/dd/yyyy and convert to yyyy-MM-dd
+                        import datetime
+                        try:
+                            dt = datetime.datetime.strptime(val, '%m/%d/%Y')
+                            iso_val = dt.strftime('%Y-%m-%d')
+                            qs = qs.filter(**{f'dynamic_data__{field.key}': iso_val})
+                        except ValueError:
+                            pass  # Invalid date format, ignore filter
         if status:
             qs = qs.filter(status=status)
         if assigned == 'yes':
@@ -139,15 +160,24 @@ class AssetListView(ListView):
         context = super().get_context_data(**kwargs)
         context['categories'] = AssetCategory.objects.all()
         context['statuses'] = Asset.STATUS_CHOICES
-        # For dynamic filter UI
         selected_category = self.request.GET.get('category')
         if selected_category:
+            # Show all dynamic fields for the selected category
             context['dynamic_fields'] = AssetCategoryField.objects.filter(category_id=selected_category)
         else:
-            context['dynamic_fields'] = []
+            # Show the union of all dynamic fields across all categories, deduplicated by key and label (case-insensitive)
+            all_fields = AssetCategoryField.objects.all()
+            seen = set()
+            unique_fields = []
+            for f in all_fields:
+                dedup_key = (f.key.lower().strip(), f.label.lower().strip())
+                if dedup_key not in seen:
+                    unique_fields.append(f)
+                    seen.add(dedup_key)
+            context['dynamic_fields'] = unique_fields
         return context
 
-class AssetDetailView(DetailView):
+class AssetDetailView(LoginRequiredMixin, DetailView):
     model = Asset
     template_name = 'assets/asset_detail.html'
     context_object_name = 'asset'
@@ -191,7 +221,7 @@ def asset_by_code(request):
         return JsonResponse({'success': True, 'asset': data})
     return JsonResponse({'success': False})
 
-class AssetDetailByUUIDView(DetailView):
+class AssetDetailByUUIDView(LoginRequiredMixin, DetailView):
     model = Asset
     template_name = 'assets/asset_detail.html'
     context_object_name = 'asset'
@@ -874,3 +904,31 @@ def full_audit_log_api(request):
         for log in page_obj
     ]
     return JsonResponse({'audit_log': data, 'page': page_obj.number, 'num_pages': paginator.num_pages, 'total': paginator.count})
+
+@login_required
+def user_assets_api(request):
+    user = request.user
+    assets = Asset.objects.filter(assigned_to=user)
+    data = []
+    for asset in assets:
+        data.append({
+            'name': str(asset),
+            'serial': asset.dynamic_data.get('serial_number', ''),
+            'assigned': str(asset.assigned_to) if asset.assigned_to else '',
+            'status': asset.status,
+        })
+    return JsonResponse({'assets': data})
+
+@login_required
+def user_activity_api(request):
+    user = request.user
+    logs = AuditLog.objects.filter(user=user).order_by('-timestamp')[:20]
+    data = []
+    for log in logs:
+        data.append({
+            'action': log.action,
+            'asset': str(log.asset) if log.asset else '',
+            'time': localtime(log.timestamp).strftime('%Y-%m-%d %H:%M'),
+            'details': log.details,
+        })
+    return JsonResponse({'logs': data})

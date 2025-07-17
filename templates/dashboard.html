@@ -16,6 +16,69 @@
     <div id="dashboard-widgets">
       <!-- Real-time data cards and table will be loaded here via AJAX/JS -->
     </div>
+    <section id="dashboard-activity-feeds" class="mb-5">
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+              <i class="bi bi-plus-circle me-2"></i>Recently Added Assets
+            </div>
+            <ul id="recent-added-assets" class="list-group list-group-flush" aria-live="polite"></ul>
+            <nav class="d-flex justify-content-between align-items-center mt-2" aria-label="Recently Added Assets pagination">
+              <button id="recent-added-assets-prev" class="btn btn-outline-primary btn-sm" disabled>Previous</button>
+              <span id="recent-added-assets-page-info" class="mx-2"></span>
+              <button id="recent-added-assets-next" class="btn btn-outline-primary btn-sm" disabled>Next</button>
+            </nav>
+          </div>
+          <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+              <i class="bi bi-upc-scan me-2"></i>Recent Scans
+            </div>
+            <ul id="recent-scans" class="list-group list-group-flush" aria-live="polite"></ul>
+            <nav class="d-flex justify-content-between align-items-center mt-2" aria-label="Recent Scans pagination">
+              <button id="recent-scans-prev" class="btn btn-outline-primary btn-sm" disabled>Previous</button>
+              <span id="recent-scans-page-info" class="mx-2"></span>
+              <button id="recent-scans-next" class="btn btn-outline-primary btn-sm" disabled>Next</button>
+            </nav>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark">
+              <i class="bi bi-arrow-left-right me-2"></i>Recent Transfers
+            </div>
+            <ul id="recent-transfers" class="list-group list-group-flush" aria-live="polite"></ul>
+            <nav class="d-flex justify-content-between align-items-center mt-2" aria-label="Recent Transfers pagination">
+              <button id="recent-transfers-prev" class="btn btn-outline-primary btn-sm" disabled>Previous</button>
+              <span id="recent-transfers-page-info" class="mx-2"></span>
+              <button id="recent-transfers-next" class="btn btn-outline-primary btn-sm" disabled>Next</button>
+            </nav>
+          </div>
+          <div class="card shadow-sm mb-4">
+            <div class="card-header bg-danger text-white">
+              <i class="bi bi-tools me-2"></i>Recent Maintenance
+            </div>
+            <ul id="recent-maintenance" class="list-group list-group-flush" aria-live="polite"></ul>
+            <nav class="d-flex justify-content-between align-items-center mt-2" aria-label="Recent Maintenance pagination">
+              <button id="recent-maintenance-prev" class="btn btn-outline-primary btn-sm" disabled>Previous</button>
+              <span id="recent-maintenance-page-info" class="mx-2"></span>
+              <button id="recent-maintenance-next" class="btn btn-outline-primary btn-sm" disabled>Next</button>
+            </nav>
+          </div>
+          <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+              <i class="bi bi-clipboard-data me-2"></i>Audit Log
+            </div>
+            <ul id="audit-log" class="list-group list-group-flush" aria-live="polite"></ul>
+            <nav class="d-flex justify-content-between align-items-center mt-2" aria-label="Audit Log pagination">
+              <button id="audit-log-prev" class="btn btn-outline-primary btn-sm" disabled>Previous</button>
+              <span id="audit-log-page-info" class="mx-2"></span>
+              <button id="audit-log-next" class="btn btn-outline-primary btn-sm" disabled>Next</button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </section>
     <section id="dashboard-activity" class="mb-5">
       <h3 class="mb-3">Recent Activity Logs</h3>
       <div class="glass p-3 mb-4">
@@ -69,12 +132,12 @@
             <canvas id="chart-location" height="220"></canvas>
           </div>
         </div>
-        <div class="col-md-12">
+        {% comment %} <div class="col-md-12">
           <div class="glass p-3 mb-4">
             <h5>Depreciation / Value Trend</h5>
             <canvas id="chart-depreciation" height="220"></canvas>
           </div>
-        </div>
+        </div> {% endcomment %}
       </div>
     </section>
   </main>

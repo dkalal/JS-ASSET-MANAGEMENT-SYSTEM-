@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from assets.views import (
     asset_create, get_dynamic_fields, AssetListView, AssetDetailView, AssetScanView, asset_by_code, AssetDetailByUUIDView, asset_export, AssetBulkImportView, download_import_template, dashboard_summary_api, dashboard_activity_api, dashboard_chart_data_api,
-    recent_added_assets_api, recent_scans_api, recent_transfers_api, recent_maintenance_api, full_audit_log_api
+    recent_added_assets_api, recent_scans_api, recent_transfers_api, recent_maintenance_api, full_audit_log_api, user_assets_api, user_activity_api
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -26,6 +26,7 @@ from django.contrib.auth import views as auth_views
 from django.views.generic import TemplateView
 from reports.views import reports_dashboard, generate_report
 from audit.views import audit_dashboard
+from users.views import api_create_user, profile
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -54,6 +55,12 @@ urlpatterns = [
     path('recent-transfers-api/', recent_transfers_api, name='recent_transfers_api'),
     path('recent-maintenance-api/', recent_maintenance_api, name='recent_maintenance_api'),
     path('full-audit-log-api/', full_audit_log_api, name='full_audit_log_api'),
+    path('api/create-user/', api_create_user, name='api_create_user'),
+    path('api/user-assets/', user_assets_api, name='user_assets_api'),
+    path('api/user-activity/', user_activity_api, name='user_activity_api'),
+    path('profile/', profile, name='profile'),
+    path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),
+    path('password_change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
 ]
 
 if settings.DEBUG:
