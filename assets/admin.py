@@ -3,6 +3,12 @@ from .models import AssetCategory, Asset, AssetCategoryField
 from django.forms.models import BaseInlineFormSet
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
+from audit.utils import log_audit, ASSIGN_ACTION, MAINTENANCE_ACTION
+from django import forms
+from django.urls import reverse
+from django.utils.safestring import mark_safe
+from django.conf import settings
+import json
 
 class AssetCategoryFieldInline(admin.TabularInline):
     model = AssetCategoryField
@@ -44,8 +50,55 @@ class AssetResource(resources.ModelResource):
             data[f'dyn_{k}'] = v
         return data
 
+class AssetAdminForm(forms.ModelForm):
+    class Meta:
+        model = Asset
+        fields = '__all__'
+
+    class Media:
+        js = (
+            'admin/js/asset_dynamic_fields.js',
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # If editing, get the category from the instance
+        category = self.initial.get('category') or (self.instance.category.pk if self.instance and self.instance.category_id else None)
+        if category:
+            fields = AssetCategoryField.objects.filter(category_id=category)
+            for f in fields:
+                fname = f"dyn_{f.key}"
+                self.fields[fname] = forms.CharField(
+                    label=f.label,
+                    required=f.required,
+                    widget=forms.TextInput(attrs={'class': 'vTextField'})
+                )
+                # Prepopulate if editing
+                if self.instance and self.instance.dynamic_data:
+                    self.fields[fname].initial = self.instance.dynamic_data.get(f.key, '')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Collect dynamic fields
+        dynamic_data = {}
+        for name in self.fields:
+            if name.startswith('dyn_'):
+                key = name.replace('dyn_', '')
+                dynamic_data[key] = cleaned_data.get(name)
+        cleaned_data['dynamic_data'] = dynamic_data
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.dynamic_data = self.cleaned_data.get('dynamic_data', {})
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
 @admin.register(Asset)
 class AssetAdmin(ImportExportModelAdmin):
+    form = AssetAdminForm
     resource_class = AssetResource
     list_display = ('pk', 'category', 'status', 'assigned_to', 'created_at', 'purchase_value', 'purchase_date', 'depreciation_method', 'useful_life_years')
     list_filter = ('status', 'category', 'depreciation_method')
@@ -60,6 +113,22 @@ class AssetAdmin(ImportExportModelAdmin):
         # TODO: Implement PDF export with branding
         self.message_user(request, 'PDF export coming soon!')
     export_as_pdf.short_description = 'Export selected as PDF'
+
+    def save_model(self, request, obj, form, change):
+        old_obj = None
+        if change:
+            old_obj = Asset.objects.get(pk=obj.pk)
+        super().save_model(request, obj, form, change)
+        # Assignment logging
+        if change and old_obj and old_obj.assigned_to != obj.assigned_to and obj.assigned_to:
+            log_audit(request.user, ASSIGN_ACTION, obj, f'Asset assigned to {obj.assigned_to.username} via admin', related_user=obj.assigned_to)
+        # Maintenance logging
+        if change and old_obj and old_obj.status != obj.status and obj.status == 'maintenance':
+            log_audit(request.user, MAINTENANCE_ACTION, obj, 'Asset marked as under maintenance via admin')
+
+    def has_change_permission(self, request, obj=None):
+        # Only admin and manager can change
+        return request.user.is_authenticated and getattr(request.user, 'role', None) in ('admin', 'manager')
 
 @admin.register(AssetCategoryField)
 class AssetCategoryFieldAdmin(admin.ModelAdmin):

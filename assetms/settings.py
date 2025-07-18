@@ -153,3 +153,4 @@ AUTH_USER_MODEL = 'users.User'
 
 # Ensure all login-required redirects use the branded login page
 LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/dashboard/'

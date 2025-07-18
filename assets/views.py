@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, ListView, DetailView, TemplateView
+from django.views.generic import CreateView, ListView, DetailView, TemplateView, UpdateView
 from .models import Asset, AssetCategory, AssetCategoryField, ExportLog
 from .forms import AssetForm
 import qrcode
@@ -27,9 +27,9 @@ from django.contrib import messages
 from openpyxl.utils import get_column_letter
 from django.db import transaction
 from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from audit.models import AuditLog
-from audit.utils import log_audit
+from audit.utils import log_audit, ASSIGN_ACTION, MAINTENANCE_ACTION
 from django.core.paginator import Paginator, EmptyPage
 from django.utils.timezone import localtime
 
@@ -39,14 +39,18 @@ def is_admin_or_manager(user):
 
 # Create your views here.
 
-class AssetCreateView(CreateView):
+class AssetCreateView(UserPassesTestMixin, CreateView):
     model = Asset
     form_class = AssetForm
     template_name = 'assets/asset_form.html'
     success_url = reverse_lazy('asset_list')
 
+    def test_func(self):
+        return self.request.user.is_authenticated and self.request.user.role in ('admin', 'manager')
+
     def form_valid(self, form):
         asset = form.save(commit=False)
+        assigned_to = form.cleaned_data.get('assigned_to')
         asset.save()  # Save first to ensure UUID is set
         # Generate QR code with direct URL
         base_url = self.request.build_absolute_uri('/')[:-1]  # Remove trailing slash
@@ -56,6 +60,8 @@ class AssetCreateView(CreateView):
         qr.save(buffer, 'PNG')
         asset.qr_code.save(f"asset_{asset.uuid}.png", ContentFile(buffer.getvalue()), save=False)
         asset.save()
+        if assigned_to:
+            log_audit(self.request.user, ASSIGN_ACTION, asset, f'Asset assigned to {assigned_to}', related_user=assigned_to)
         log_audit(self.request.user, 'create', asset, 'Asset created via dashboard')
         messages.success(self.request, f"Asset '{asset}' registered successfully.")
         print(f"[DEBUG] Asset created: {asset}")
@@ -79,6 +85,41 @@ class AssetCreateView(CreateView):
         return context
 
 asset_create = user_passes_test(is_admin_or_manager, login_url='login')(AssetCreateView.as_view())
+
+# Asset update view for admin/manager with audit logging
+class AssetUpdateView(UserPassesTestMixin, UpdateView):
+    model = Asset
+    form_class = AssetForm
+    template_name = 'assets/asset_form.html'
+    success_url = reverse_lazy('asset_list')
+    slug_field = 'uuid'
+    slug_url_kwarg = 'uuid'
+
+    def test_func(self):
+        return self.request.user.is_authenticated and self.request.user.role in ('admin', 'manager')
+
+    def form_valid(self, form):
+        old_obj = self.get_object()
+        asset = form.save(commit=False)
+        assigned_to = form.cleaned_data.get('assigned_to')
+        status = form.cleaned_data.get('status')
+        asset.save()
+        # Assignment logging: if assigned_to changes
+        if old_obj.assigned_to != assigned_to and assigned_to:
+            log_audit(self.request.user, ASSIGN_ACTION, asset, f'Asset assigned to {assigned_to}', related_user=assigned_to)
+        # Transfer logging: if status changes to 'transferred'
+        if old_obj.status != status and status == 'transferred':
+            log_audit(
+                self.request.user,
+                ASSIGN_ACTION,
+                asset,
+                f"Asset status set to 'transferred' (from {old_obj.assigned_to} to {assigned_to})",
+                related_user=assigned_to
+            )
+        # Maintenance logging
+        if old_obj.status != status and status == 'maintenance':
+            log_audit(self.request.user, MAINTENANCE_ACTION, asset, 'Asset marked as under maintenance')
+        return super().form_valid(form)
 
 @require_GET
 def get_dynamic_fields(request):
@@ -471,6 +512,8 @@ class AssetBulkImportView(View):
                             user_obj = User.objects.filter(username=assigned_to).first()
                             if user_obj:
                                 asset.assigned_to = user_obj
+                                # Log assignment/transfer
+                                log_audit(request.user, ASSIGN_ACTION, asset, f'Asset assigned to {user_obj.username} via bulk import (row {i+2})', related_user=user_obj)
                         # Dynamic fields
                         dyn_data = {}
                         for field in dynamic_fields:

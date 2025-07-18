@@ -15,7 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from assets.views import (
     asset_create, get_dynamic_fields, AssetListView, AssetDetailView, AssetScanView, asset_by_code, AssetDetailByUUIDView, asset_export, AssetBulkImportView, download_import_template, dashboard_summary_api, dashboard_activity_api, dashboard_chart_data_api,
     recent_added_assets_api, recent_scans_api, recent_transfers_api, recent_maintenance_api, full_audit_log_api, user_assets_api, user_activity_api
@@ -27,6 +27,7 @@ from django.views.generic import TemplateView
 from reports.views import reports_dashboard, generate_report
 from audit.views import audit_dashboard
 from users.views import api_create_user, profile
+from assets.views import AssetUpdateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -61,6 +62,7 @@ urlpatterns = [
     path('profile/', profile, name='profile'),
     path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),
     path('password_change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
+    path('assets/', include('assets.urls')),
 ]
 
 if settings.DEBUG:

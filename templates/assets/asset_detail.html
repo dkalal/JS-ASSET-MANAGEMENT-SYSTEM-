@@ -54,6 +54,9 @@
 </div>
 {% if user.is_authenticated %}
 <a href="{% url 'asset_list' %}" class="btn btn-secondary mt-4">Back to List</a>
+{% if user.is_authenticated and user.role in 'admin manager' %}
+<a href="{% url 'asset_update' asset.uuid %}" class="btn btn-primary mt-4">Edit Asset (Transfer / Maintenance)</a>
+{% endif %}
 {% endif %}
 {% endblock %}
 {% comment %} Add this filter in your template tags: @register.filter def get_item(dictionary, key): return dictionary.get(key) {% endcomment %} 
