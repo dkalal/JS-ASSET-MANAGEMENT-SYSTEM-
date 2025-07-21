@@ -51,31 +51,6 @@
       </svg>
       <span class="visually-hidden">Toggle dark/light mode</span>
     </button>
-    <script>
-      // Enhance theme icon for glass/Apple style
-      document.addEventListener('DOMContentLoaded', function() {
-        function updateThemeIcon() {
-          const theme = localStorage.getItem('theme') || 'light';
-          const sun = document.querySelector('#theme-toggle-icon #sun-icon');
-          const moon = document.querySelector('#theme-toggle-icon #moon-icon');
-          if (theme === 'dark') {
-            sun.style.display = 'none';
-            moon.style.display = '';
-          } else {
-            sun.style.display = '';
-            moon.style.display = 'none';
-          }
-        }
-        updateThemeIcon();
-        const btn = document.getElementById('theme-toggle-btn');
-        if (btn) {
-          btn.addEventListener('click', function() {
-            setTimeout(updateThemeIcon, 120); // sync with theme change
-          });
-        }
-        window.addEventListener('storage', updateThemeIcon);
-      });
-    </script>
     <div class="dropdown ms-3">
       <button class="btn btn-avatar dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="background:var(--accent); color:#fff; border-radius:50%; width:40px; height:40px; font-weight:bold; display:flex; align-items:center; justify-content:center;">
         {% if user.profile_image %}

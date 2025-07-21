@@ -109,31 +109,6 @@
 </div>
 {% endblock %}
 {% block extra_scripts %}
-<script>
-// Custom modal open/close logic for report generation
-const openGenerateReportModalBtn = document.getElementById('openGenerateReportModal');
-const generateReportModalCustom = document.getElementById('generateReportModalCustom');
-const closeGenerateReportModalBtn = document.getElementById('closeGenerateReportModal');
-const cancelGenerateReportModalBtn = document.getElementById('cancelGenerateReportModal');
-openGenerateReportModalBtn.addEventListener('click', () => {
-  generateReportModalCustom.classList.add('active');
-  generateReportModalCustom.focus();
-});
-closeGenerateReportModalBtn.addEventListener('click', () => {
-  generateReportModalCustom.classList.remove('active');
-});
-cancelGenerateReportModalBtn.addEventListener('click', () => {
-  generateReportModalCustom.classList.remove('active');
-});
-generateReportModalCustom.addEventListener('click', (e) => {
-  if (e.target === generateReportModalCustom) {
-    generateReportModalCustom.classList.remove('active');
-  }
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && generateReportModalCustom.classList.contains('active')) {
-    generateReportModalCustom.classList.remove('active');
-  }
-});
-</script>
+{% load static %}
+<script src="{% static 'js/reports_dashboard.js' %}"></script>
 {% endblock %} 

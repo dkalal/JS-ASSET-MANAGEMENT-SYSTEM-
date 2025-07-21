@@ -61,6 +61,9 @@ def profile(request):
         form = UserProfileForm(request.POST, request.FILES, instance=user)
         if form.is_valid():
             form.save()
+            # Re-authenticate user to refresh session and user object
+            from django.contrib.auth import login as auth_login
+            auth_login(request, user)
             log_audit(user, 'edit', None, 'Profile updated')
             messages.success(request, 'Profile updated successfully.')
         else:

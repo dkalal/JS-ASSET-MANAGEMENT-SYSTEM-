@@ -2,6 +2,8 @@
 {% load asset_extras %}
 {% block title %}Register Asset{% endblock %}
 {% block content %}
+<!-- User role for JS (CSP-compliant, non-intrusive, extensible) -->
+<div id="user-role" data-role="{{ user_role|default:'' }}" style="display:none;"></div>
 <h2 class="mb-4">Register New Asset</h2>
 <!-- Robust error display block -->
 {% if form.errors %}
@@ -158,10 +160,14 @@
 }
 </style>
 <div id="addUserModalCustom" class="custom-modal-overlay" tabindex="-1">
-  <div class="custom-modal" role="dialog" aria-modal="true" aria-labelledby="addUserModalCustomLabel">
-    <div class="custom-modal-header">
-      <h5 class="modal-title" id="addUserModalCustomLabel">Add New User</h5>
-      <button type="button" class="custom-modal-close" id="closeAddUserModal" aria-label="Close">&times;</button>
+  <div class="glass-modal" role="dialog" aria-modal="true" aria-labelledby="addUserModalCustomLabel">
+    <div class="custom-modal-header d-flex align-items-center justify-content-between">
+      <h4 class="modal-title fw-bold mb-0" id="addUserModalCustomLabel">
+        <i class="bi bi-person-plus me-2 text-success"></i> Add New User
+      </h4>
+      <button type="button" class="custom-modal-close" id="closeAddUserModal" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
     </div>
     <div class="custom-modal-body">
       <form id="add-user-form">
@@ -191,8 +197,9 @@
         </div>
         <div id="add-user-errors" class="alert alert-danger d-none"></div>
         <div id="add-user-success" class="alert alert-success d-none"></div>
-        <div class="d-flex justify-content-end">
-          <button type="submit" class="btn btn-success">Create User</button>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button type="button" class="btn btn-outline-secondary px-4" id="cancelAddUserModal">Cancel</button>
+          <button type="submit" class="btn btn-primary px-4 fw-bold">Add User</button>
         </div>
       </form>
     </div>

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load asset_extras %}
+{% load static %}
 {% block title %}Asset List{% endblock %}
 {% block content %}
 <h2 class="mb-4">All Assets</h2>
@@ -82,7 +83,7 @@
             {% for field in dynamic_fields %}
                 <td>{{ asset.dynamic_data|get_item:field.key|default:'—' }}</td>
             {% endfor %}
-            <td><a href="{% url 'asset_detail' asset.pk %}" class="btn btn-sm btn-outline-primary">View</a></td>
+            <td><a href="{% url 'asset_detail' asset.pk %}?internal=1" class="btn btn-sm btn-outline-primary">View</a></td>
         </tr>
         {% empty %}
         <tr><td colspan="{{ dynamic_fields|length|add:'6' }}" class="text-center">No assets found.</td></tr>
@@ -90,52 +91,15 @@
     </tbody>
 </table>
 <!-- Custom Export Modal (Bootstrap-independent) -->
-<style>
-.custom-modal-overlay {
-  display: none;
-  position: fixed;
-  top: 0; left: 0; width: 100vw; height: 100vh;
-  background: rgba(0,0,0,0.5);
-  z-index: 2000;
-  justify-content: center;
-  align-items: center;
-}
-.custom-modal-overlay.active {
-  display: flex;
-}
-.custom-modal {
-  background: #fff;
-  border-radius: 12px;
-  max-width: 600px;
-  width: 100%;
-  box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37);
-  padding: 0;
-  overflow: hidden;
-}
-.custom-modal-header {
-  background: #00A6EB;
-  color: #fff;
-  padding: 1rem 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.custom-modal-body {
-  padding: 1.5rem;
-}
-.custom-modal-close {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: #fff;
-  cursor: pointer;
-}
-</style>
 <div id="exportModalCustom" class="custom-modal-overlay" tabindex="-1">
-  <div class="custom-modal" role="dialog" aria-modal="true" aria-labelledby="exportModalCustomLabel">
-    <div class="custom-modal-header">
-      <h5 class="modal-title" id="exportModalCustomLabel">Export Assets</h5>
-      <button type="button" class="custom-modal-close" id="closeExportModal" aria-label="Close">&times;</button>
+  <div class="glass-modal" role="dialog" aria-modal="true" aria-labelledby="exportModalCustomLabel">
+    <div class="custom-modal-header d-flex align-items-center justify-content-between">
+      <h4 class="modal-title fw-bold mb-0" id="exportModalCustomLabel">
+        <i class="bi bi-box-arrow-up-right me-2 text-success"></i> Export Assets
+      </h4>
+      <button type="button" class="custom-modal-close" id="closeExportModal" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
     </div>
     <div class="custom-modal-body">
       <form id="export-form" method="post" action="{% url 'asset_export' %}">
@@ -168,101 +132,6 @@
 </div>
 {% endblock %}
 {% block extra_scripts %}
-<script>
-// Custom modal open/close logic
-const openExportModalBtn = document.getElementById('openExportModal');
-const exportModalCustom = document.getElementById('exportModalCustom');
-const closeExportModalBtn = document.getElementById('closeExportModal');
-openExportModalBtn.addEventListener('click', () => {
-  exportModalCustom.classList.add('active');
-  exportModalCustom.focus();
-});
-closeExportModalBtn.addEventListener('click', () => {
-  exportModalCustom.classList.remove('active');
-});
-exportModalCustom.addEventListener('click', (e) => {
-  if (e.target === exportModalCustom) {
-    exportModalCustom.classList.remove('active');
-  }
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && exportModalCustom.classList.contains('active')) {
-    exportModalCustom.classList.remove('active');
-  }
-});
-// Asset selection logic
-const selectAllCheckbox = document.getElementById('select-all-assets');
-const assetCheckboxes = document.querySelectorAll('.asset-checkbox');
-selectAllCheckbox.addEventListener('change', function() {
-  assetCheckboxes.forEach(cb => { cb.checked = this.checked; });
-  updateExportSummary();
-});
-assetCheckboxes.forEach(cb => {
-  cb.addEventListener('change', updateExportSummary);
-});
-function getSelectedAssetIds() {
-  return Array.from(assetCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
-}
-function updateExportSummary() {
-  const selected = getSelectedAssetIds();
-  const summary = document.getElementById('export-summary');
-  const hiddenInput = document.getElementById('selected-asset-ids');
-  if (selected.length > 0) {
-    summary.textContent = `You are exporting ${selected.length} selected asset${selected.length > 1 ? 's' : ''}.`;
-    hiddenInput.value = selected.join(',');
-  } else {
-    summary.textContent = 'You are exporting all filtered assets.';
-    hiddenInput.value = '';
-  }
-}
-// Dynamically populate export columns
-function getColumns() {
-    let columns = [
-        {key: 'ID', label: 'ID'},
-        {key: 'Category', label: 'Category'},
-        {key: 'Status', label: 'Status'},
-        {key: 'Assigned To', label: 'Assigned To'},
-        {key: 'Created', label: 'Created'},
-        {key: 'Updated', label: 'Updated'}
-    ];
-    {% if dynamic_fields %}
-        {% for field in dynamic_fields %}
-            columns.push({key: '{{ field.key }}', label: '{{ field.label }}'});
-        {% endfor %}
-    {% endif %}
-    return columns;
-}
-function renderExportColumns() {
-    const columns = getColumns();
-    const container = document.getElementById('export-columns-list');
-    container.innerHTML = '';
-    columns.forEach(col => {
-        const div = document.createElement('div');
-        div.className = 'col-md-4 mb-1';
-        div.innerHTML = `<div class='form-check'>
-            <input class='form-check-input export-col' type='checkbox' name='columns' value='${col.key}' id='col_${col.key}' checked>
-            <label class='form-check-label' for='col_${col.key}'>${col.label}</label>
-        </div>`;
-        container.appendChild(div);
-    });
-    const controls = document.createElement('div');
-    controls.className = 'col-12 mb-2';
-    controls.innerHTML = `<button type='button' class='btn btn-sm btn-link' onclick='selectAllExportCols(true)'>Select All</button> |
-        <button type='button' class='btn btn-sm btn-link' onclick='selectAllExportCols(false)'>Deselect All</button>`;
-    container.prepend(controls);
-}
-function selectAllExportCols(val) {
-    document.querySelectorAll('.export-col').forEach(cb => { cb.checked = val; });
-}
-document.addEventListener('DOMContentLoaded', function() {
-    renderExportColumns();
-    updateExportSummary();
-    // Ensure only checked columns are submitted
-    document.getElementById('export-form').addEventListener('submit', function(e) {
-        document.querySelectorAll('.export-col').forEach(cb => {
-            if (!cb.checked) cb.disabled = true;
-        });
-    });
-});
-</script>
+{% load static %}
+<script src="{% static 'js/asset_list.js' %}"></script>
 {% endblock %} 

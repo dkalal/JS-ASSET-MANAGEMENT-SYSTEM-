@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from assets.views import (
     asset_create, get_dynamic_fields, AssetListView, AssetDetailView, AssetScanView, asset_by_code, AssetDetailByUUIDView, asset_export, AssetBulkImportView, download_import_template, dashboard_summary_api, dashboard_activity_api, dashboard_chart_data_api,
-    recent_added_assets_api, recent_scans_api, recent_transfers_api, recent_maintenance_api, full_audit_log_api, user_assets_api, user_activity_api
+    recent_added_assets_api, recent_scans_api, recent_transfers_api, recent_maintenance_api, full_audit_log_api, user_assets_api, user_activity_api, api_create_category, api_categories, api_category_fields, api_create_field, api_update_field, api_delete_field
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -63,6 +63,13 @@ urlpatterns = [
     path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),
     path('password_change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
     path('assets/', include('assets.urls')),
+    path('api/create-category/', api_create_category, name='api_create_category'),
+    path('api/categories/', api_categories, name='api_categories'),
+    # --- Dynamic Field Management API ---
+    path('api/category/<int:category_id>/fields/', api_category_fields, name='api_category_fields'),
+    path('api/category/<int:category_id>/fields/create/', api_create_field, name='api_create_field'),
+    path('api/field/<int:field_id>/update/', api_update_field, name='api_update_field'),
+    path('api/field/<int:field_id>/delete/', api_delete_field, name='api_delete_field'),
 ]
 
 if settings.DEBUG:

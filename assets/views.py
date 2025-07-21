@@ -8,9 +8,9 @@ import qrcode
 from io import BytesIO
 from django.core.files.base import ContentFile
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from django.db.models import Q
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie, csrf_protect
 from django.utils.decorators import method_decorator
 import re
 from django.http import HttpResponse
@@ -268,6 +268,38 @@ class AssetDetailByUUIDView(LoginRequiredMixin, DetailView):
     context_object_name = 'asset'
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
+
+    def get(self, request, *args, **kwargs):
+        asset = self.get_object()
+        # Only log scan if not internal navigation
+        is_internal = request.GET.get('internal') == '1'
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        device_info = 'Unknown'
+        if 'Android' in user_agent or 'iPhone' in user_agent or 'iPad' in user_agent:
+            device_info = 'Mobile App/Browser'
+        elif 'Windows' in user_agent or 'Macintosh' in user_agent or 'Linux' in user_agent:
+            device_info = 'Desktop/Scanner Device'
+        elif 'ZBar' in user_agent or 'Scanner' in user_agent:
+            device_info = 'Hardware QR Scanner'
+        if not is_internal:
+            # Log as scan (not just view)
+            log_audit(
+                request.user if request.user.is_authenticated else None,
+                'scan',
+                asset,
+                f'Asset scanned via QR code. Device: {device_info}. User-Agent: {user_agent[:120]}',
+                metadata={'device_info': device_info, 'user_agent': user_agent}
+            )
+        else:
+            # Log as regular view
+            log_audit(
+                request.user if request.user.is_authenticated else None,
+                'view',
+                asset,
+                f'Asset viewed via internal navigation. Device: {device_info}. User-Agent: {user_agent[:120]}',
+                metadata={'device_info': device_info, 'user_agent': user_agent}
+            )
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -864,6 +896,7 @@ def recent_scans_api(request):
             'user': str(log.user) if log.user else '',
             'timestamp': localtime(log.timestamp).strftime('%Y-%m-%d %H:%M'),
             'details': log.details,
+            'device_info': (log.metadata.get('device_info') if log.metadata else None) or 'Unknown',
         }
         for log in page_obj
     ]
@@ -975,3 +1008,115 @@ def user_activity_api(request):
             'details': log.details,
         })
     return JsonResponse({'logs': data})
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and u.role == 'admin')
+@require_POST
+def api_create_category(request):
+    from assets.models import AssetCategory
+    name = request.POST.get('name', '').strip()
+    description = request.POST.get('description', '').strip()
+    if not name:
+        return JsonResponse({'success': False, 'error': 'Category name is required.'}, status=400)
+    if AssetCategory.objects.filter(name__iexact=name).exists():
+        return JsonResponse({'success': False, 'error': 'A category with this name already exists.'}, status=400)
+    category = AssetCategory.objects.create(name=name, dynamic_fields={},)
+    if description:
+        # Optionally store description in a future field or metadata
+        pass
+    from audit.utils import log_audit
+    log_audit(request.user, 'create', None, f'Category created: {name}')
+    return JsonResponse({'success': True, 'category': {'id': category.id, 'name': category.name}})
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and u.role == 'admin')
+def api_categories(request):
+    categories = list(AssetCategory.objects.all().order_by('name').values('id', 'name'))
+    return JsonResponse({'success': True, 'categories': categories})
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and u.role == 'admin')
+@require_GET
+def api_category_fields(request, category_id):
+    try:
+        category = AssetCategory.objects.get(pk=category_id)
+    except AssetCategory.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Category not found.'}, status=404)
+    fields = AssetCategoryField.objects.filter(category=category).order_by('label')
+    data = [
+        {
+            'id': f.id,
+            'key': f.key,
+            'label': f.label,
+            'type': f.type,
+            'required': f.required,
+        } for f in fields
+    ]
+    return JsonResponse({'success': True, 'fields': data})
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and u.role == 'admin')
+@require_POST
+@csrf_protect
+@transaction.atomic
+def api_create_field(request, category_id):
+    from audit.utils import log_audit
+    try:
+        category = AssetCategory.objects.get(pk=category_id)
+    except AssetCategory.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Category not found.'}, status=404)
+    key = request.POST.get('key', '').strip()
+    label = request.POST.get('label', '').strip()
+    field_type = request.POST.get('type', '').strip()
+    required = request.POST.get('required', 'false') == 'true'
+    if not key or not label or field_type not in dict(AssetCategoryField.FIELD_TYPES):
+        return JsonResponse({'success': False, 'error': 'Invalid field data.'}, status=400)
+    if AssetCategoryField.objects.filter(category=category, key__iexact=key).exists():
+        return JsonResponse({'success': False, 'error': 'Field key must be unique within the category.'}, status=400)
+    field = AssetCategoryField.objects.create(
+        category=category, key=key, label=label, type=field_type, required=required
+    )
+    log_audit(request.user, 'create', None, f'Dynamic field created: {label} ({key}) in category {category.name}')
+    return JsonResponse({'success': True, 'field': {'id': field.id, 'key': field.key, 'label': field.label, 'type': field.type, 'required': field.required}})
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and u.role == 'admin')
+@require_POST
+@csrf_protect
+@transaction.atomic
+def api_update_field(request, field_id):
+    from audit.utils import log_audit
+    try:
+        field = AssetCategoryField.objects.select_related('category').get(pk=field_id)
+    except AssetCategoryField.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Field not found.'}, status=404)
+    label = request.POST.get('label', '').strip()
+    field_type = request.POST.get('type', '').strip()
+    required = request.POST.get('required', 'false') == 'true'
+    if not label or field_type not in dict(AssetCategoryField.FIELD_TYPES):
+        return JsonResponse({'success': False, 'error': 'Invalid field data.'}, status=400)
+    field.label = label
+    field.type = field_type
+    field.required = required
+    field.save()
+    log_audit(request.user, 'update', None, f'Dynamic field updated: {label} ({field.key}) in category {field.category.name}')
+    return JsonResponse({'success': True, 'field': {'id': field.id, 'key': field.key, 'label': field.label, 'type': field.type, 'required': field.required}})
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and u.role == 'admin')
+@require_POST
+@csrf_protect
+@transaction.atomic
+def api_delete_field(request, field_id):
+    from audit.utils import log_audit
+    try:
+        field = AssetCategoryField.objects.select_related('category').get(pk=field_id)
+    except AssetCategoryField.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Field not found.'}, status=404)
+    category = field.category
+    key = field.key
+    label = field.label
+    # Optionally: check if field is in use in any Asset.dynamic_data
+    field.delete()
+    log_audit(request.user, 'delete', None, f'Dynamic field deleted: {label} ({key}) in category {category.name}')
+    return JsonResponse({'success': True})

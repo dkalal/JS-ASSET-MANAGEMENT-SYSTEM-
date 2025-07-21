@@ -129,6 +129,9 @@ function renderActivityFeed(listId, data, type, page, numPages, total) {
                     icon = "<i class='bi bi-upc-scan text-info me-2'></i>";
                     main = `<strong>${sanitizeHTML(item.asset_name || 'Asset')}</strong>`;
                     details = `scanned by <span class='text-primary'>${sanitizeHTML(item.user)}</span> on <span class='text-secondary'>${sanitizeHTML(item.timestamp)}</span>`;
+                    if (item.device_info) {
+                        details += ` <span class='badge bg-light text-dark ms-2' title='Scan Source'>${sanitizeHTML(item.device_info)}</span>`;
+                    }
                     break;
                 case 'transfers':
                     icon = "<i class='bi bi-arrow-left-right text-warning me-2'></i>";
@@ -395,6 +398,32 @@ function fetchAndRenderActivityLogTable(page = 1) {
             window._activityLogNumPages = data.num_pages;
         });
 }
+
+// Enhance theme icon for glass/Apple style (moved from inline script in topbar.html for CSP compliance)
+document.addEventListener('DOMContentLoaded', function() {
+  function updateThemeIcon() {
+    const theme = localStorage.getItem('theme') || 'light';
+    const sun = document.querySelector('#theme-toggle-icon #sun-icon');
+    const moon = document.querySelector('#theme-toggle-icon #moon-icon');
+    if (sun && moon) {
+      if (theme === 'dark') {
+        sun.style.display = 'none';
+        moon.style.display = '';
+      } else {
+        sun.style.display = '';
+        moon.style.display = 'none';
+      }
+    }
+  }
+  updateThemeIcon();
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(updateThemeIcon, 120); // sync with theme change
+    });
+  }
+  window.addEventListener('storage', updateThemeIcon);
+});
 
 document.addEventListener('DOMContentLoaded', function() {
   // Theme toggle button
