@@ -26,7 +26,7 @@ from django.contrib.auth import views as auth_views
 from django.views.generic import TemplateView
 from reports.views import reports_dashboard, generate_report
 from audit.views import audit_dashboard
-from users.views import api_create_user, profile
+# from users.views import profile
 from assets.views import AssetUpdateView
 
 urlpatterns = [
@@ -42,8 +42,7 @@ urlpatterns = [
     path('dashboard_summary_api/', dashboard_summary_api, name='dashboard_summary_api'),
     path('dashboard_activity_api/', dashboard_activity_api, name='dashboard_activity_api'),
     path('dashboard_chart_data_api/', dashboard_chart_data_api, name='dashboard_chart_data_api'),
-    path('login/', auth_views.LoginView.as_view(template_name='assets/login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
+    path('', include('users.urls')),
     path('assets/export/', asset_export, name='asset_export'),
     path('test-modal/', TemplateView.as_view(template_name='test_modal.html'), name='test_modal'),
     path('assets/bulk-import/', AssetBulkImportView.as_view(), name='asset_bulk_import'),
@@ -56,10 +55,8 @@ urlpatterns = [
     path('recent-transfers-api/', recent_transfers_api, name='recent_transfers_api'),
     path('recent-maintenance-api/', recent_maintenance_api, name='recent_maintenance_api'),
     path('full-audit-log-api/', full_audit_log_api, name='full_audit_log_api'),
-    path('api/create-user/', api_create_user, name='api_create_user'),
     path('api/user-assets/', user_assets_api, name='user_assets_api'),
     path('api/user-activity/', user_activity_api, name='user_activity_api'),
-    path('profile/', profile, name='profile'),
     path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),
     path('password_change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
     path('assets/', include('assets.urls')),
@@ -70,6 +67,21 @@ urlpatterns = [
     path('api/category/<int:category_id>/fields/create/', api_create_field, name='api_create_field'),
     path('api/field/<int:field_id>/update/', api_update_field, name='api_update_field'),
     path('api/field/<int:field_id>/delete/', api_delete_field, name='api_delete_field'),
+
+    path('settings/', include('settings.urls')),
+    path('api/', include('users.api_urls')),
+    
+    # Security API endpoints
+    path('settings/api/security-metrics/', __import__('settings.views', fromlist=['api_security_metrics']).api_security_metrics, name='api_security_metrics'),
+    path('settings/api/security-activities/', __import__('settings.views', fromlist=['api_security_activities']).api_security_activities, name='api_security_activities'),
+    path('settings/api/security-settings/', __import__('settings.views', fromlist=['api_security_settings']).api_security_settings, name='api_security_settings'),
+    path('settings/api/update-security-settings/', __import__('settings.views', fromlist=['api_update_security_settings']).api_update_security_settings, name='api_update_security_settings'),
+    path('settings/api/create/', __import__('settings.views', fromlist=['create_setting']).create_setting, name='api_create_setting'),
+    path('settings/api/update/', __import__('settings.views', fromlist=['update_setting']).update_setting, name='api_update_setting'),
+    
+    # Help and Documents
+    path('help/', __import__('help.views', fromlist=['HelpCenterView']).HelpCenterView.as_view(), name='help_center'),
+    path('documents/', __import__('help.views', fromlist=['DocumentsView']).DocumentsView.as_view(), name='documents'),
 ]
 
 if settings.DEBUG:

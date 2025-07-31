@@ -1,0 +1,319 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}System Settings{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2 class="fw-bold" style="color:var(--accent);">
+        <i class="bi bi-gear-fill me-2"></i>System Settings
+      </h2>
+      <div class="d-flex gap-2">
+        {% if 'organization_settings' in available_settings %}
+        <a href="{% url 'organization_settings' %}" class="btn btn-outline-primary">
+          <i class="fas fa-building me-1"></i>Organization
+        </a>
+        {% endif %}
+        {% if 'session_management' in available_settings %}
+        <a href="{% url 'session_management' %}" class="btn btn-outline-info">
+          <i class="fas fa-users-cog me-1"></i>Sessions
+        </a>
+        {% endif %}
+        {% if 'security_settings' in available_settings %}
+        <a href="{% url 'security_privacy_settings' %}" class="btn btn-outline-danger">
+          <i class="fas fa-shield-alt me-1"></i>Security
+        </a>
+        {% endif %}
+        {% if 'system_settings' in available_settings %}
+        <button class="btn btn-primary" id="createSettingBtn">
+          <i class="bi bi-plus-lg me-1"></i>Add Setting
+        </button>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Organization Quick Info -->
+    {% if organization %}
+    <div class="glass p-4 mb-4 shadow-sm">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h4 class="mb-1 fw-bold">
+            <i class="fas fa-building me-2 text-primary"></i>{{ organization.name }}
+          </h4>
+          <p class="text-muted mb-0">{{ organization.email }} • {{ organization.timezone }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+          <a href="{% url 'organization_settings' %}" class="btn btn-primary">
+            <i class="fas fa-edit me-1"></i>Manage Organization
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    
+    {% if settings_by_category %}
+      {% for category, settings in settings_by_category.items %}
+      <div class="glass p-4 mb-4 shadow-sm">
+        <h4 class="mb-3 fw-bold text-capitalize">
+          <i class="bi bi-folder me-2"></i>{{ category }}
+        </h4>
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Setting</th>
+                <th>Value</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for setting in settings %}
+              <tr>
+                <td class="fw-semibold">{{ setting.key }}</td>
+                <td>
+                  <span class="setting-value" data-setting-id="{{ setting.id }}">{{ setting.value }}</span>
+                </td>
+                <td><span class="badge bg-secondary">{{ setting.get_setting_type_display }}</span></td>
+                <td class="text-muted">{{ setting.description|default:"No description" }}</td>
+                <td>
+                  <button class="btn btn-sm btn-outline-primary edit-setting-btn" 
+                          data-setting-id="{{ setting.id }}"
+                          data-setting-key="{{ setting.key }}"
+                          data-setting-value="{{ setting.value }}"
+                          data-setting-type="{{ setting.setting_type }}"
+                          data-setting-description="{{ setting.description }}"
+                          data-setting-category="{{ setting.category }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="glass p-4 text-center">
+        <i class="bi bi-gear fs-1 text-muted mb-3 d-block"></i>
+        <h4>No Settings Configured</h4>
+        <p class="text-muted">Start by creating your first system setting.</p>
+        <button class="btn btn-primary" id="createFirstSettingBtn">
+          <i class="bi bi-plus-lg me-1"></i>Create First Setting
+        </button>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Edit Setting Modal -->
+<div id="editSettingModal" class="custom-modal-overlay">
+  <div class="custom-modal glass-modal">
+    <div class="custom-modal-header">
+      <h5 class="modal-title fw-bold mb-0">
+        <i class="bi bi-pencil me-2"></i>Edit Setting
+      </h5>
+      <button type="button" class="custom-modal-close" id="closeEditModal">
+        <span>&times;</span>
+      </button>
+    </div>
+    <form id="editSettingForm">
+      <div class="custom-modal-body">
+        <div id="editFeedback" class="mb-3"></div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Setting Key</label>
+          <input type="text" class="form-control" id="editSettingKey" readonly>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Value</label>
+          <textarea class="form-control" id="editSettingValue" rows="3" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Description</label>
+          <input type="text" class="form-control" id="editSettingDescription">
+        </div>
+      </div>
+      <div class="custom-modal-footer d-flex justify-content-end gap-2 p-3">
+        <button type="button" class="btn btn-outline-secondary" id="cancelEdit">Cancel</button>
+        <button type="submit" class="btn btn-primary">Update Setting</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Create Setting Modal -->
+<div id="createSettingModal" class="custom-modal-overlay">
+  <div class="custom-modal glass-modal">
+    <div class="custom-modal-header">
+      <h5 class="modal-title fw-bold mb-0">
+        <i class="bi bi-plus-lg me-2"></i>Create Setting
+      </h5>
+      <button type="button" class="custom-modal-close" id="closeCreateModal">
+        <span>&times;</span>
+      </button>
+    </div>
+    <form id="createSettingForm">
+      <div class="custom-modal-body">
+        <div id="createFeedback" class="mb-3"></div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Setting Key</label>
+            <input type="text" class="form-control" id="createSettingKey" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Category</label>
+            <input type="text" class="form-control" id="createSettingCategory" value="general">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Value</label>
+          <textarea class="form-control" id="createSettingValue" rows="3" required></textarea>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Type</label>
+            <select class="form-select" id="createSettingType">
+              <option value="string">String</option>
+              <option value="integer">Integer</option>
+              <option value="boolean">Boolean</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+          <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="createSettingPublic">
+              <label class="form-check-label" for="createSettingPublic">Public Setting</label>
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Description</label>
+          <input type="text" class="form-control" id="createSettingDescription">
+        </div>
+      </div>
+      <div class="custom-modal-footer d-flex justify-content-end gap-2 p-3">
+        <button type="button" class="btn btn-outline-secondary" id="cancelCreate">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Setting</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editModal = document.getElementById('editSettingModal');
+    const createModal = document.getElementById('createSettingModal');
+    let currentSettingId = null;
+    
+    // Edit setting functionality
+    document.querySelectorAll('.edit-setting-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentSettingId = this.dataset.settingId;
+            document.getElementById('editSettingKey').value = this.dataset.settingKey;
+            document.getElementById('editSettingValue').value = this.dataset.settingValue;
+            document.getElementById('editSettingDescription').value = this.dataset.settingDescription;
+            editModal.classList.add('active');
+        });
+    });
+    
+    // Create setting functionality
+    document.getElementById('createSettingBtn').addEventListener('click', () => {
+        createModal.classList.add('active');
+    });
+    
+    document.getElementById('createFirstSettingBtn')?.addEventListener('click', () => {
+        createModal.classList.add('active');
+    });
+    
+    // Modal close handlers
+    document.getElementById('closeEditModal').addEventListener('click', () => {
+        editModal.classList.remove('active');
+    });
+    
+    document.getElementById('closeCreateModal').addEventListener('click', () => {
+        createModal.classList.remove('active');
+    });
+    
+    document.getElementById('cancelEdit').addEventListener('click', () => {
+        editModal.classList.remove('active');
+    });
+    
+    document.getElementById('cancelCreate').addEventListener('click', () => {
+        createModal.classList.remove('active');
+    });
+    
+    // Form submissions
+    document.getElementById('editSettingForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const feedback = document.getElementById('editFeedback');
+        feedback.innerHTML = '<div class="alert alert-info">Updating setting...</div>';
+        
+        try {
+            const formData = new FormData();
+            formData.append('setting_id', currentSettingId);
+            formData.append('value', document.getElementById('editSettingValue').value);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            const response = await fetch('/settings/api/update/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                feedback.innerHTML = '<div class="alert alert-success">Setting updated successfully!</div>';
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                feedback.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            }
+        } catch (error) {
+            feedback.innerHTML = '<div class="alert alert-danger">Network error occurred</div>';
+        }
+    });
+    
+    document.getElementById('createSettingForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const feedback = document.getElementById('createFeedback');
+        feedback.innerHTML = '<div class="alert alert-info">Creating setting...</div>';
+        
+        try {
+            const formData = new FormData();
+            formData.append('key', document.getElementById('createSettingKey').value);
+            formData.append('value', document.getElementById('createSettingValue').value);
+            formData.append('setting_type', document.getElementById('createSettingType').value);
+            formData.append('description', document.getElementById('createSettingDescription').value);
+            formData.append('category', document.getElementById('createSettingCategory').value);
+            formData.append('is_public', document.getElementById('createSettingPublic').checked);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            const response = await fetch('/settings/api/create/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                feedback.innerHTML = '<div class="alert alert-success">Setting created successfully!</div>';
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                feedback.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            }
+        } catch (error) {
+            feedback.innerHTML = '<div class="alert alert-danger">Network error occurred</div>';
+        }
+    });
+});
+</script>
+{% endblock %}

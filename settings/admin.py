@@ -1,11 +1,9 @@
 from django.contrib import admin
-from .models import ThemeSetting, BackupRestore
+from .models import SystemSetting
 
-@admin.register(ThemeSetting)
-class ThemeSettingAdmin(admin.ModelAdmin):
-    list_display = ('primary_color', 'secondary_color', 'accent_color', 'background_color', 'updated_at')
-
-@admin.register(BackupRestore)
-class BackupRestoreAdmin(admin.ModelAdmin):
-    list_display = ('backup_file', 'created_at', 'restored')
-    list_filter = ('restored',)
+@admin.register(SystemSetting)
+class SystemSettingAdmin(admin.ModelAdmin):
+    list_display = ['key', 'value', 'setting_type', 'category', 'is_public', 'updated_at']
+    list_filter = ['setting_type', 'category', 'is_public', 'updated_at']
+    search_fields = ['key', 'value', 'description']
+    readonly_fields = ['created_at', 'updated_at']

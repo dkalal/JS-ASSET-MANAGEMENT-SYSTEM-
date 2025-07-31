@@ -1,74 +1,34 @@
-from django.shortcuts import render
-from django.contrib.auth import login as auth_login, logout as auth_logout, authenticate
-from django.http import HttpResponseRedirect
-from django.urls import reverse
-from audit.utils import log_audit
-from django.views.decorators.http import require_POST
-from django.http import JsonResponse
-from django.contrib.auth.decorators import user_passes_test
-from .forms import UserCreationForm
-from django.contrib.auth.decorators import login_required
-from .forms import UserProfileForm
+from django.shortcuts import render, redirect
+from django.contrib.auth import logout
 from django.contrib import messages
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
+from django.views.decorators.cache import never_cache
+from django.contrib.auth.views import LoginView
+from django.utils.decorators import method_decorator
 
-# Example login view
+@method_decorator([ensure_csrf_cookie, csrf_protect, never_cache], name='dispatch')
+class EnterpriseLoginView(LoginView):
+    """Enterprise Login View with enhanced CSRF protection"""
+    template_name = 'registration/login.html'
+    redirect_authenticated_user = True
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['csrf_token'] = self.request.META.get('CSRF_COOKIE')
+        return context
 
-def login_view(request):
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
-            auth_login(request, user)
-            log_audit(user, 'login', None, 'User logged in')
-            return HttpResponseRedirect(reverse('dashboard'))
-        else:
-            return render(request, 'assets/login.html', {'error': 'Invalid credentials'})
-    return render(request, 'assets/login.html')
-
-# Example logout view
-
-def logout_view(request):
-    if request.user.is_authenticated:
-        log_audit(request.user, 'logout', None, 'User logged out')
-    auth_logout(request)
-    return HttpResponseRedirect(reverse('login'))
-
-@require_POST
-@user_passes_test(lambda u: u.is_authenticated and u.role == 'admin')
-def api_create_user(request):
-    form = UserCreationForm(request.POST)
-    if form.is_valid():
-        user = form.save()
-        log_audit(request.user, 'create', None, f'User created via asset form: {user.username}')
-        return JsonResponse({
-            'success': True,
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'role': user.role,
-                'display': str(user),
-            }
-        })
-    else:
-        return JsonResponse({'success': False, 'errors': form.errors}, status=400)
-
-@login_required
+@csrf_protect
 def profile(request):
-    user = request.user
+    """User profile view"""
+    return render(request, 'users/profile.html', {'user_obj': request.user})
+
+@csrf_protect
+@never_cache
+def custom_logout(request):
+    """Custom logout view with proper CSRF handling"""
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, request.FILES, instance=user)
-        if form.is_valid():
-            form.save()
-            # Re-authenticate user to refresh session and user object
-            from django.contrib.auth import login as auth_login
-            auth_login(request, user)
-            log_audit(user, 'edit', None, 'Profile updated')
-            messages.success(request, 'Profile updated successfully.')
-        else:
-            messages.error(request, 'Please correct the errors below.')
-    else:
-        form = UserProfileForm(instance=user)
-    # Assigned assets and activity logs will be loaded via AJAX
-    return render(request, 'users/profile.html', {'form': form, 'user_obj': user})
+        logout(request)
+        messages.success(request, 'You have been successfully logged out.')
+        return redirect('login')
+    
+    return redirect('dashboard')

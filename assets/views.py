@@ -230,7 +230,7 @@ class AssetDetailView(LoginRequiredMixin, DetailView):
         return redirect('asset_detail_by_uuid', uuid=asset.uuid)
 
 class AssetScanView(TemplateView):
-    template_name = 'assets/asset_scan.html'
+    template_name = 'assets/asset_scan_enterprise.html'
 
 @require_GET
 @csrf_exempt

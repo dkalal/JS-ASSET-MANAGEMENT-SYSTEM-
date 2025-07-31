@@ -1,0 +1,606 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}System Settings - Enterprise Asset Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h2 font-bold mb-2">
+      <i class="bi bi-gear text-primary me-2"></i>
+      System Settings
+    </h1>
+    <p class="text-muted">Configure and manage enterprise system settings</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary btn-sm" id="exportSettings">
+      <i class="bi bi-download me-1"></i>Export
+    </button>
+    <button class="btn btn-outline-info btn-sm" id="importSettings">
+      <i class="bi bi-upload me-1"></i>Import
+    </button>
+    {% if 'system_settings' in available_settings %}
+    <button class="btn btn-primary" id="createSettingBtn">
+      <i class="bi bi-plus-lg me-1"></i>Add Setting
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Settings Navigation -->
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex flex-wrap gap-2">
+      {% if 'organization_settings' in available_settings %}
+      <a href="{% url 'organization_settings' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-building me-1"></i>Organization
+      </a>
+      {% endif %}
+      {% if 'security_settings' in available_settings %}
+      <a href="{% url 'security_privacy_settings' %}" class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-shield-check me-1"></i>Security
+      </a>
+      {% endif %}
+      {% if 'session_management' in available_settings %}
+      <a href="{% url 'session_management' %}" class="btn btn-outline-info btn-sm">
+        <i class="bi bi-people me-1"></i>Sessions
+      </a>
+      {% endif %}
+      <button class="btn btn-outline-secondary btn-sm" id="systemHealth">
+        <i class="bi bi-heart-pulse me-1"></i>System Health
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Organization Overview -->
+{% if organization %}
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">
+      <i class="bi bi-building me-2"></i>Organization Profile
+    </h5>
+  </div>
+  <div class="card-body">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <h6 class="font-bold mb-1">{{ organization.name }}</h6>
+        <p class="text-muted mb-2">{{ organization.email }} • {{ organization.timezone }}</p>
+        <div class="d-flex gap-3 text-sm">
+          <span><i class="bi bi-calendar me-1"></i>Established: {{ organization.created_at|date:"M Y" }}</span>
+          <span><i class="bi bi-people me-1"></i>Users: {{ total_users|default:"N/A" }}</span>
+          <span><i class="bi bi-archive me-1"></i>Assets: {{ total_assets|default:"N/A" }}</span>
+        </div>
+      </div>
+      <div class="col-md-4 text-end">
+        <a href="{% url 'organization_settings' %}" class="btn btn-primary">
+          <i class="bi bi-pencil me-1"></i>Edit Profile
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Settings Categories -->
+{% if settings_by_category %}
+<div class="row">
+  {% for category, settings in settings_by_category.items %}
+  <div class="col-lg-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <div class="d-flex align-items-center justify-content-between">
+          <h5 class="mb-0 text-capitalize">
+            <i class="bi bi-folder me-2"></i>{{ category }}
+          </h5>
+          <span class="badge bg-primary">{{ settings|length }}</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="enterprise-table-container">
+          <div class="enterprise-table-wrapper" style="max-height: 400px;">
+            <table class="enterprise-table">
+              <thead>
+                <tr>
+                  <th>Setting</th>
+                  <th>Value</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for setting in settings %}
+              <tr>
+                <td>
+                  <div>
+                    <div class="font-medium">{{ setting.key }}</div>
+                    <small class="text-muted">{{ setting.description|default:"No description"|truncatechars:50 }}</small>
+                  </div>
+                </td>
+                <td>
+                  <div class="d-flex align-items-center">
+                    <span class="setting-value me-2" data-setting-id="{{ setting.id }}">
+                      {{ setting.value|truncatechars:30 }}
+                    </span>
+                    <span class="badge bg-secondary badge-sm">{{ setting.get_setting_type_display }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <button class="btn btn-outline-primary btn-sm edit-setting-btn" 
+                            data-setting-id="{{ setting.id }}"
+                            data-setting-key="{{ setting.key }}"
+                            data-setting-value="{{ setting.value }}"
+                            data-setting-type="{{ setting.setting_type }}"
+                            data-setting-description="{{ setting.description }}"
+                            data-setting-category="{{ setting.category }}"
+                            title="Edit Setting">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-outline-info btn-sm view-setting-btn"
+                            data-setting-id="{{ setting.id }}"
+                            title="View Details">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<!-- Empty State -->
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-gear display-1 text-muted mb-4"></i>
+    <h4>No Settings Configured</h4>
+    <p class="text-muted mb-4">Get started by creating your first system setting to customize your enterprise environment.</p>
+    <button class="btn btn-primary" id="createFirstSettingBtn">
+      <i class="bi bi-plus-lg me-2"></i>Create First Setting
+    </button>
+  </div>
+</div>
+{% endif %}
+
+<!-- System Health Card -->
+<div class="card mt-4" id="systemHealthCard" style="display: none;">
+  <div class="card-header">
+    <h5 class="mb-0">
+      <i class="bi bi-heart-pulse me-2"></i>System Health
+    </h5>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-3 text-center">
+        <div class="mb-2">
+          <i class="bi bi-cpu display-4 text-success"></i>
+        </div>
+        <h6>CPU Usage</h6>
+        <p class="text-success mb-0">Normal</p>
+      </div>
+      <div class="col-md-3 text-center">
+        <div class="mb-2">
+          <i class="bi bi-memory display-4 text-info"></i>
+        </div>
+        <h6>Memory</h6>
+        <p class="text-info mb-0">Optimal</p>
+      </div>
+      <div class="col-md-3 text-center">
+        <div class="mb-2">
+          <i class="bi bi-hdd display-4 text-warning"></i>
+        </div>
+        <h6>Storage</h6>
+        <p class="text-warning mb-0">75% Used</p>
+      </div>
+      <div class="col-md-3 text-center">
+        <div class="mb-2">
+          <i class="bi bi-wifi display-4 text-success"></i>
+        </div>
+        <h6>Network</h6>
+        <p class="text-success mb-0">Connected</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Enhanced Modals -->
+<!-- Edit Setting Modal -->
+<div class="modal fade" id="editSettingModal" tabindex="-1" aria-labelledby="editSettingModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editSettingModalLabel">
+          <i class="bi bi-pencil me-2"></i>Edit Setting
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="editSettingForm">
+        <div class="modal-body">
+          <div id="editFeedback" class="mb-3"></div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label font-medium">Setting Key</label>
+                <input type="text" class="form-control" id="editSettingKey" readonly>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label font-medium">Category</label>
+                <input type="text" class="form-control" id="editSettingCategory" readonly>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label font-medium">Value</label>
+            <textarea class="form-control" id="editSettingValue" rows="3" required></textarea>
+            <div class="form-text">Enter the setting value. Format depends on the setting type.</div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label font-medium">Description</label>
+            <input type="text" class="form-control" id="editSettingDescription" placeholder="Brief description of this setting">
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label font-medium">Type</label>
+            <input type="text" class="form-control" id="editSettingType" readonly>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i>Update Setting
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Create Setting Modal -->
+<div class="modal fade" id="createSettingModal" tabindex="-1" aria-labelledby="createSettingModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="createSettingModalLabel">
+          <i class="bi bi-plus-lg me-2"></i>Create New Setting
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="createSettingForm">
+        <div class="modal-body">
+          <div id="createFeedback" class="mb-3"></div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label font-medium">Setting Key *</label>
+                <input type="text" class="form-control" id="createSettingKey" required placeholder="e.g., max_file_size">
+                <div class="form-text">Unique identifier for this setting (lowercase, underscores only)</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label font-medium">Category</label>
+                <select class="form-select" id="createSettingCategory">
+                  <option value="general">General</option>
+                  <option value="security">Security</option>
+                  <option value="performance">Performance</option>
+                  <option value="ui">User Interface</option>
+                  <option value="integration">Integration</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label font-medium">Type *</label>
+                <select class="form-select" id="createSettingType" required>
+                  <option value="string">String</option>
+                  <option value="integer">Integer</option>
+                  <option value="boolean">Boolean</option>
+                  <option value="json">JSON</option>
+                  <option value="float">Float</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label font-medium">Access Level</label>
+                <select class="form-select" id="createSettingAccess">
+                  <option value="private">Private (Admin Only)</option>
+                  <option value="public">Public (All Users)</option>
+                  <option value="manager">Manager Level</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label font-medium">Value *</label>
+            <textarea class="form-control" id="createSettingValue" rows="3" required placeholder="Enter the setting value"></textarea>
+            <div class="form-text">The default value for this setting</div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label font-medium">Description</label>
+            <input type="text" class="form-control" id="createSettingDescription" placeholder="Brief description of what this setting controls">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Create Setting
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- View Setting Modal -->
+<div class="modal fade" id="viewSettingModal" tabindex="-1" aria-labelledby="viewSettingModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="viewSettingModalLabel">
+          <i class="bi bi-eye me-2"></i>Setting Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="viewSettingContent"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="editFromView">
+          <i class="bi bi-pencil me-1"></i>Edit Setting
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+class EnterpriseSettingsManager {
+  constructor() {
+    this.currentSettingId = null;
+    this.init();
+  }
+
+  init() {
+    this.bindEvents();
+    this.initializeTooltips();
+  }
+
+  bindEvents() {
+    // Modal triggers
+    document.getElementById('createSettingBtn')?.addEventListener('click', () => {
+      const modal = new bootstrap.Modal(document.getElementById('createSettingModal'));
+      modal.show();
+    });
+    
+    document.getElementById('createFirstSettingBtn')?.addEventListener('click', () => {
+      const modal = new bootstrap.Modal(document.getElementById('createSettingModal'));
+      modal.show();
+    });
+
+    // Edit buttons
+    document.querySelectorAll('.edit-setting-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => this.handleEditSetting(e));
+    });
+
+    // View buttons
+    document.querySelectorAll('.view-setting-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => this.handleViewSetting(e));
+    });
+
+    // Form submissions
+    document.getElementById('editSettingForm').addEventListener('submit', (e) => this.handleEditSubmit(e));
+    document.getElementById('createSettingForm').addEventListener('submit', (e) => this.handleCreateSubmit(e));
+
+    // System health toggle
+    document.getElementById('systemHealth').addEventListener('click', () => {
+      const card = document.getElementById('systemHealthCard');
+      card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Export/Import
+    document.getElementById('exportSettings').addEventListener('click', () => this.exportSettings());
+    document.getElementById('importSettings').addEventListener('click', () => this.importSettings());
+  }
+
+  handleEditSetting(e) {
+    const btn = e.currentTarget;
+    this.currentSettingId = btn.dataset.settingId;
+    
+    document.getElementById('editSettingKey').value = btn.dataset.settingKey;
+    document.getElementById('editSettingValue').value = btn.dataset.settingValue;
+    document.getElementById('editSettingDescription').value = btn.dataset.settingDescription || '';
+    document.getElementById('editSettingCategory').value = btn.dataset.settingCategory;
+    document.getElementById('editSettingType').value = btn.dataset.settingType;
+    
+    const modal = new bootstrap.Modal(document.getElementById('editSettingModal'));
+    modal.show();
+  }
+
+  handleViewSetting(e) {
+    const btn = e.currentTarget;
+    const settingId = btn.dataset.settingId;
+    
+    // Find the setting data from the edit button
+    const editBtn = document.querySelector(`[data-setting-id="${settingId}"].edit-setting-btn`);
+    
+    const content = `
+      <div class="table-responsive">
+        <table class="table">
+          <tr><th>Key</th><td><code>${editBtn.dataset.settingKey}</code></td></tr>
+          <tr><th>Value</th><td><pre class="bg-light p-2 rounded">${editBtn.dataset.settingValue}</pre></td></tr>
+          <tr><th>Type</th><td><span class="badge bg-secondary">${editBtn.dataset.settingType}</span></td></tr>
+          <tr><th>Category</th><td>${editBtn.dataset.settingCategory}</td></tr>
+          <tr><th>Description</th><td>${editBtn.dataset.settingDescription || 'No description'}</td></tr>
+        </table>
+      </div>
+    `;
+    
+    document.getElementById('viewSettingContent').innerHTML = content;
+    
+    // Set up edit from view
+    document.getElementById('editFromView').onclick = () => {
+      const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewSettingModal'));
+      viewModal.hide();
+      setTimeout(() => this.handleEditSetting(e), 300);
+    };
+    
+    const modal = new bootstrap.Modal(document.getElementById('viewSettingModal'));
+    modal.show();
+  }
+
+  async handleEditSubmit(e) {
+    e.preventDefault();
+    
+    const feedback = document.getElementById('editFeedback');
+    feedback.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split me-2"></i>Updating setting...</div>';
+    
+    try {
+      const formData = new FormData();
+      formData.append('setting_id', this.currentSettingId);
+      formData.append('value', document.getElementById('editSettingValue').value);
+      formData.append('description', document.getElementById('editSettingDescription').value);
+      formData.append('csrfmiddlewaretoken', this.getCSRFToken());
+      
+      const response = await fetch('/settings/api/update/', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        feedback.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>Setting updated successfully!</div>';
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        feedback.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>${data.error}</div>`;
+      }
+    } catch (error) {
+      feedback.innerHTML = '<div class="alert alert-danger"><i class="bi bi-wifi-off me-2"></i>Network error occurred</div>';
+    }
+  }
+
+  async handleCreateSubmit(e) {
+    e.preventDefault();
+    
+    const feedback = document.getElementById('createFeedback');
+    feedback.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split me-2"></i>Creating setting...</div>';
+    
+    try {
+      const formData = new FormData();
+      formData.append('key', document.getElementById('createSettingKey').value);
+      formData.append('value', document.getElementById('createSettingValue').value);
+      formData.append('setting_type', document.getElementById('createSettingType').value);
+      formData.append('description', document.getElementById('createSettingDescription').value);
+      formData.append('category', document.getElementById('createSettingCategory').value);
+      formData.append('is_public', document.getElementById('createSettingAccess').value === 'public');
+      formData.append('csrfmiddlewaretoken', this.getCSRFToken());
+      
+      const response = await fetch('/settings/api/create/', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        feedback.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>Setting created successfully!</div>';
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        feedback.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>${data.error}</div>`;
+      }
+    } catch (error) {
+      feedback.innerHTML = '<div class="alert alert-danger"><i class="bi bi-wifi-off me-2"></i>Network error occurred</div>';
+    }
+  }
+
+  exportSettings() {
+    // Create export functionality
+    const settings = [];
+    document.querySelectorAll('.edit-setting-btn').forEach(btn => {
+      settings.push({
+        key: btn.dataset.settingKey,
+        value: btn.dataset.settingValue,
+        type: btn.dataset.settingType,
+        category: btn.dataset.settingCategory,
+        description: btn.dataset.settingDescription
+      });
+    });
+    
+    const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `settings-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  importSettings() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const settings = JSON.parse(e.target.result);
+            console.log('Imported settings:', settings);
+            alert(`Successfully imported ${settings.length} settings. Please refresh to see changes.`);
+          } catch (error) {
+            alert('Invalid JSON file. Please check the format and try again.');
+          }
+        };
+        reader.readAsText(file);
+      }
+    };
+    input.click();
+  }
+
+  initializeTooltips() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  }
+
+  getCSRFToken() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'csrftoken') {
+        return value;
+      }
+    }
+    return '';
+  }
+}
+
+// Initialize settings manager
+document.addEventListener('DOMContentLoaded', function() {
+  new EnterpriseSettingsManager();
+});
+</script>
+{% endblock %}

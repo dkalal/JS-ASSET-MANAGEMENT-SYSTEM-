@@ -219,6 +219,69 @@ document.addEventListener('DOMContentLoaded', function() {
   // Initial load
   loadAssignedAssets();
   loadUserActivity();
+  
+  // View My Permissions functionality
+  const viewMyPermissionsBtn = document.getElementById('viewMyPermissions');
+  const userPermissionsSummary = document.getElementById('user-permissions-summary');
+  const currentUserPermissions = document.getElementById('current-user-permissions');
+  
+  if (viewMyPermissionsBtn) {
+    viewMyPermissionsBtn.addEventListener('click', function() {
+      if (userPermissionsSummary.classList.contains('d-none')) {
+        loadCurrentUserPermissions();
+        userPermissionsSummary.classList.remove('d-none');
+        this.textContent = 'Hide My Permissions';
+      } else {
+        userPermissionsSummary.classList.add('d-none');
+        this.textContent = 'View My Permissions';
+      }
+    });
+  }
+  
+  function loadCurrentUserPermissions() {
+    if (!currentUserPermissions) return;
+    
+    // Get current user role from the page
+    const userRole = document.querySelector('.badge').textContent.toLowerCase();
+    
+    const permissions = {
+      admin: [
+        { name: 'View Assets', icon: 'bi-eye', color: 'success' },
+        { name: 'Create Assets', icon: 'bi-plus-circle', color: 'primary' },
+        { name: 'Edit Assets', icon: 'bi-pencil', color: 'warning' },
+        { name: 'Delete Assets', icon: 'bi-trash', color: 'danger' },
+        { name: 'Manage Users', icon: 'bi-people', color: 'info' },
+        { name: 'View Reports', icon: 'bi-graph-up', color: 'secondary' },
+        { name: 'Export Data', icon: 'bi-download', color: 'dark' },
+        { name: 'System Admin', icon: 'bi-gear', color: 'danger' }
+      ],
+      manager: [
+        { name: 'View Assets', icon: 'bi-eye', color: 'success' },
+        { name: 'Create Assets', icon: 'bi-plus-circle', color: 'primary' },
+        { name: 'Edit Assets', icon: 'bi-pencil', color: 'warning' },
+        { name: 'View Reports', icon: 'bi-graph-up', color: 'secondary' },
+        { name: 'Export Data', icon: 'bi-download', color: 'dark' }
+      ],
+      user: [
+        { name: 'View Assets', icon: 'bi-eye', color: 'success' }
+      ]
+    };
+    
+    const userPermissions = permissions[userRole] || [];
+    currentUserPermissions.innerHTML = '';
+    
+    userPermissions.forEach(perm => {
+      const permDiv = document.createElement('div');
+      permDiv.className = 'col-md-6 col-lg-4';
+      permDiv.innerHTML = `
+        <div class="d-flex align-items-center p-2 bg-light rounded">
+          <i class="${perm.icon} text-${perm.color} me-2"></i>
+          <small class="fw-semibold">${perm.name}</small>
+        </div>
+      `;
+      currentUserPermissions.appendChild(permDiv);
+    });
+  }
 
   // --- Admin: Create Category Custom Modal Logic ---
   const openCreateCategoryBtn = document.getElementById('openCreateCategoryModal');
@@ -297,6 +360,262 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   }
+  // --- Admin: Permissions Management Custom Modal Logic ---
+  const openPermissionsBtn = document.getElementById('openPermissionsModal');
+  const permissionsModalCustom = document.getElementById('permissionsModalCustom');
+  const closePermissionsModalBtn = document.getElementById('closePermissionsModal');
+  const closePermissionsModalBtnFooter = document.getElementById('closePermissionsModalBtn');
+  const permissionsFeedback = document.getElementById('permissions-feedback');
+  const roleSelect = document.getElementById('role-select');
+  const rolePermissions = document.getElementById('role-permissions');
+  const selectedRoleName = document.getElementById('selected-role-name');
+  const usersList = document.getElementById('users-list');
+
+  function openPermissionsModal() {
+    if (permissionsFeedback) permissionsFeedback.innerHTML = '';
+    if (permissionsModalCustom) {
+      permissionsModalCustom.classList.add('active');
+      permissionsModalCustom.focus();
+      loadUsersList();
+    }
+  }
+
+  function closePermissionsModal() {
+    if (permissionsModalCustom) permissionsModalCustom.classList.remove('active');
+    if (permissionsFeedback) permissionsFeedback.innerHTML = '';
+    if (roleSelect) roleSelect.value = '';
+    if (rolePermissions) rolePermissions.classList.add('d-none');
+  }
+
+  let usersData = { page: 1, numPages: 1, users: [] };
+  let searchTimeout;
+
+  function loadUsersList(page = 1, search = '') {
+    if (!usersList) return;
+    usersList.innerHTML = '<tr><td colspan="3" class="text-center"><div class="spinner-border spinner-border-sm me-2"></div>Loading users...</td></tr>';
+    
+    const params = new URLSearchParams({ page, search });
+    fetch(`/api/users/?${params}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          usersData = data;
+          renderUsersList(data.users);
+          updateUsersPagination();
+        } else {
+          showPermissionsFeedback('Failed to load users', 'danger');
+        }
+      })
+      .catch(() => {
+        showPermissionsFeedback('Network error loading users', 'danger');
+      });
+  }
+
+  function renderUsersList(users) {
+    if (!usersList) return;
+    usersList.innerHTML = '';
+    
+    if (!users.length) {
+      usersList.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No users found</td></tr>';
+      return;
+    }
+    
+    users.forEach(user => {
+      const tr = document.createElement('tr');
+      const roleColor = user.role === 'admin' ? 'danger' : user.role === 'manager' ? 'warning' : 'secondary';
+      tr.innerHTML = `
+        <td>
+          <div class="fw-semibold">${user.full_name}</div>
+          <small class="text-muted">${user.email}</small>
+        </td>
+        <td><span class="badge bg-${roleColor}">${user.role}</span></td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary" onclick="openEditUserRole(${user.id}, '${user.full_name}', '${user.role}')" title="Edit Role">
+            <i class="bi bi-pencil"></i>
+          </button>
+        </td>
+      `;
+      usersList.appendChild(tr);
+    });
+  }
+
+  function updateUsersPagination() {
+    const prevBtn = document.getElementById('users-prev');
+    const nextBtn = document.getElementById('users-next');
+    const pageInfo = document.getElementById('users-page-info');
+    
+    if (prevBtn && nextBtn && pageInfo) {
+      prevBtn.disabled = usersData.page <= 1;
+      nextBtn.disabled = usersData.page >= usersData.num_pages;
+      pageInfo.textContent = `Page ${usersData.page} of ${usersData.num_pages}`;
+    }
+  }
+
+  function showPermissionsFeedback(msg, type = 'info') {
+    if (permissionsFeedback) {
+      permissionsFeedback.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>${msg}</div>`;
+    }
+  }
+
+  function showRolePermissions(role) {
+    if (!rolePermissions || !selectedRoleName) return;
+    
+    selectedRoleName.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+    rolePermissions.classList.remove('d-none');
+    
+    // Set permissions based on role
+    const permissions = {
+      admin: ['perm-view-assets', 'perm-create-assets', 'perm-edit-assets', 'perm-delete-assets', 'perm-manage-users', 'perm-view-reports', 'perm-export-data', 'perm-system-admin'],
+      manager: ['perm-view-assets', 'perm-create-assets', 'perm-edit-assets', 'perm-view-reports', 'perm-export-data'],
+      user: ['perm-view-assets']
+    };
+    
+    // Reset all checkboxes
+    document.querySelectorAll('.permissions-grid input[type="checkbox"]').forEach(cb => {
+      cb.checked = false;
+    });
+    
+    // Check permissions for selected role
+    if (permissions[role]) {
+      permissions[role].forEach(permId => {
+        const checkbox = document.getElementById(permId);
+        if (checkbox) checkbox.checked = true;
+      });
+    }
+  }
+
+  // Event listeners for permissions modal
+  if (openPermissionsBtn && permissionsModalCustom) {
+    openPermissionsBtn.addEventListener('click', openPermissionsModal);
+  }
+  
+  if (closePermissionsModalBtn) {
+    closePermissionsModalBtn.addEventListener('click', closePermissionsModal);
+  }
+  
+  if (closePermissionsModalBtnFooter) {
+    closePermissionsModalBtnFooter.addEventListener('click', closePermissionsModal);
+  }
+  
+  if (roleSelect) {
+    roleSelect.addEventListener('change', function() {
+      if (this.value) {
+        showRolePermissions(this.value);
+      } else {
+        rolePermissions.classList.add('d-none');
+      }
+    });
+  }
+  
+  if (permissionsModalCustom) {
+    permissionsModalCustom.addEventListener('click', function(e) {
+      if (e.target === permissionsModalCustom) {
+        closePermissionsModal();
+      }
+    });
+    
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && permissionsModalCustom.classList.contains('active')) {
+        closePermissionsModal();
+      }
+    });
+  }
+
+  // User role editing functionality
+  let currentEditUserId = null;
+  const editUserRoleModal = document.getElementById('editUserRoleModal');
+  const editUserRoleForm = document.getElementById('edit-user-role-form');
+  const editUserInfo = document.getElementById('edit-user-info');
+  const editUserRoleSelect = document.getElementById('edit-user-role-select');
+  const editRoleFeedback = document.getElementById('edit-role-feedback');
+
+  window.openEditUserRole = function(userId, userName, currentRole) {
+    currentEditUserId = userId;
+    if (editUserInfo) editUserInfo.innerHTML = `<strong>${userName}</strong><br><small>Current role: ${currentRole}</small>`;
+    if (editUserRoleSelect) editUserRoleSelect.value = currentRole;
+    if (editRoleFeedback) editRoleFeedback.innerHTML = '';
+    if (editUserRoleModal) editUserRoleModal.classList.add('active');
+  };
+
+  function closeEditUserRoleModal() {
+    if (editUserRoleModal) editUserRoleModal.classList.remove('active');
+    currentEditUserId = null;
+    if (editUserRoleForm) editUserRoleForm.reset();
+    if (editRoleFeedback) editRoleFeedback.innerHTML = '';
+  }
+
+  // Event listeners for user role editing
+  if (editUserRoleForm) {
+    editUserRoleForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (!currentEditUserId) return;
+      
+      const newRole = editUserRoleSelect.value;
+      if (!newRole) {
+        editRoleFeedback.innerHTML = '<div class="alert alert-danger">Please select a role</div>';
+        return;
+      }
+      
+      editRoleFeedback.innerHTML = '<div class="alert alert-info">Updating role...</div>';
+      
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+      fetch('/api/users/update-role/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          user_id: currentEditUserId,
+          role: newRole
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          editRoleFeedback.innerHTML = '<div class="alert alert-success">Role updated successfully!</div>';
+          setTimeout(() => {
+            closeEditUserRoleModal();
+            loadUsersList(usersData.page, document.getElementById('user-search')?.value || '');
+          }, 1000);
+        } else {
+          editRoleFeedback.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+        }
+      })
+      .catch(() => {
+        editRoleFeedback.innerHTML = '<div class="alert alert-danger">Network error. Please try again.</div>';
+      });
+    });
+  }
+
+  // Close modal event listeners
+  document.getElementById('closeEditUserRoleModal')?.addEventListener('click', closeEditUserRoleModal);
+  document.getElementById('cancelEditUserRole')?.addEventListener('click', closeEditUserRoleModal);
+
+  // Search functionality
+  const userSearch = document.getElementById('user-search');
+  if (userSearch) {
+    userSearch.addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        loadUsersList(1, this.value);
+      }, 300);
+    });
+  }
+
+  // Pagination event listeners
+  document.getElementById('users-prev')?.addEventListener('click', function() {
+    if (usersData.page > 1) {
+      loadUsersList(usersData.page - 1, userSearch?.value || '');
+    }
+  });
+
+  document.getElementById('users-next')?.addEventListener('click', function() {
+    if (usersData.page < usersData.num_pages) {
+      loadUsersList(usersData.page + 1, userSearch?.value || '');
+    }
+  });
+
   // --- Admin: Dynamic Field Management Custom Modal Logic ---
   const openDynamicFieldBtn = document.getElementById('openDynamicFieldModal');
   const dynamicFieldModalCustom = document.getElementById('dynamicFieldModalCustom');

@@ -1,0 +1,719 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Security & Privacy Settings{% endblock %}
+
+{% block extra_css %}
+<style>
+    .security-card {
+        border-left: 4px solid #dc3545;
+        transition: all 0.3s ease;
+    }
+    .security-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .privacy-card {
+        border-left: 4px solid #6f42c1;
+    }
+    .toggle-switch {
+        position: relative;
+        width: 60px;
+        height: 30px;
+        background: #ccc;
+        border-radius: 15px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    .toggle-switch.active {
+        background: #28a745;
+    }
+    .toggle-slider {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 24px;
+        height: 24px;
+        background: white;
+        border-radius: 50%;
+        transition: transform 0.3s;
+    }
+    .toggle-switch.active .toggle-slider {
+        transform: translateX(30px);
+    }
+    .security-level {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    .security-high { background: #d4edda; color: #155724; }
+    .security-medium { background: #fff3cd; color: #856404; }
+    .security-low { background: #f8d7da; color: #721c24; }
+    
+    .metric-card {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .metric-icon {
+        opacity: 0.7;
+    }
+    .metric-change {
+        font-size: 0.75rem;
+        margin-top: 4px;
+    }
+    .metric-up { color: #28a745; }
+    .metric-down { color: #dc3545; }
+    .metric-same { color: #6c757d; }
+    
+    .activity-feed {
+        border: none;
+    }
+    .activity-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f1f3f4;
+        transition: background-color 0.2s;
+    }
+    .activity-item:hover {
+        background-color: #f8f9fa;
+    }
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    .activity-new {
+        background-color: #e3f2fd;
+        animation: fadeIn 0.5s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    .updating {
+        animation: pulse 1s infinite;
+    }
+    
+    .connection-status {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+    .status-connected { background-color: #28a745; }
+    .status-connecting { background-color: #ffc107; }
+    .status-disconnected { background-color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-shield-alt text-danger"></i> Security & Privacy Settings</h2>
+            <p class="text-muted">Manage security policies and privacy controls</p>
+        </div>
+        <div>
+            <span class="security-level security-high" id="securityLevel">Security Level: High</span>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Security Settings -->
+        <div class="col-lg-6">
+            <div class="card security-card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-lock"></i> Security Policies</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>Two-Factor Authentication</strong>
+                                <p class="text-muted mb-0">Require 2FA for all users</p>
+                            </div>
+                            <div class="toggle-switch active" data-setting="require_2fa">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>Password Complexity</strong>
+                                <p class="text-muted mb-0">Enforce strong password requirements</p>
+                            </div>
+                            <div class="toggle-switch active" data-setting="password_complexity">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Session Timeout (minutes)</label>
+                        <select class="form-select" id="sessionTimeout">
+                            <option value="15">15 minutes</option>
+                            <option value="30">30 minutes</option>
+                            <option value="60" selected>1 hour</option>
+                            <option value="120">2 hours</option>
+                            <option value="480">8 hours</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Maximum Login Attempts</label>
+                        <input type="number" class="form-control" id="maxLoginAttempts" value="5" min="3" max="10">
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>IP Whitelist</strong>
+                                <p class="text-muted mb-0">Restrict access to specific IP addresses</p>
+                            </div>
+                            <div class="toggle-switch" data-setting="ip_whitelist">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Privacy Settings -->
+        <div class="col-lg-6">
+            <div class="card privacy-card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-user-shield"></i> Privacy Controls</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>Data Encryption</strong>
+                                <p class="text-muted mb-0">Encrypt sensitive data at rest</p>
+                            </div>
+                            <div class="toggle-switch active" data-setting="data_encryption">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>Audit Logging</strong>
+                                <p class="text-muted mb-0">Log all user activities</p>
+                            </div>
+                            <div class="toggle-switch active" data-setting="audit_logging">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Data Retention Period (days)</label>
+                        <select class="form-select" id="dataRetention">
+                            <option value="30">30 days</option>
+                            <option value="90" selected>90 days</option>
+                            <option value="180">6 months</option>
+                            <option value="365">1 year</option>
+                            <option value="1095">3 years</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>Anonymous Analytics</strong>
+                                <p class="text-muted mb-0">Collect usage statistics anonymously</p>
+                            </div>
+                            <div class="toggle-switch" data-setting="anonymous_analytics">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>GDPR Compliance</strong>
+                                <p class="text-muted mb-0">Enable GDPR data protection features</p>
+                            </div>
+                            <div class="toggle-switch active" data-setting="gdpr_compliance">
+                                <div class="toggle-slider"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Security Monitoring -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-chart-line"></i> Real-time Security Monitoring</h5>
+                    <div>
+                        <span class="badge bg-success" id="connectionStatus">Connecting...</span>
+                        <small class="text-muted ms-2" id="lastUpdate">-</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center metric-card p-3 rounded">
+                                <div class="metric-icon text-success mb-2">
+                                    <i class="fas fa-users fa-2x"></i>
+                                </div>
+                                <h3 class="text-success mb-1" id="activeUsers">-</h3>
+                                <p class="text-muted mb-0">Active Users</p>
+                                <div class="metric-change" id="activeUsersChange"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center metric-card p-3 rounded">
+                                <div class="metric-icon text-warning mb-2">
+                                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                                </div>
+                                <h3 class="text-warning mb-1" id="failedLogins">-</h3>
+                                <p class="text-muted mb-0">Failed Logins (24h)</p>
+                                <div class="metric-change" id="failedLoginsChange"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center metric-card p-3 rounded">
+                                <div class="metric-icon text-info mb-2">
+                                    <i class="fas fa-desktop fa-2x"></i>
+                                </div>
+                                <h3 class="text-info mb-1" id="activeSessions">-</h3>
+                                <p class="text-muted mb-0">Active Sessions</p>
+                                <div class="metric-change" id="activeSessionsChange"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center metric-card p-3 rounded">
+                                <div class="metric-icon text-danger mb-2">
+                                    <i class="fas fa-shield-alt fa-2x"></i>
+                                </div>
+                                <h3 class="text-danger mb-1" id="securityAlerts">-</h3>
+                                <p class="text-muted mb-0">Security Alerts</p>
+                                <div class="metric-change" id="securityAlertsChange"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Real-time Activity Feed -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-stream"></i> Live Activity Feed</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="activityFeed" class="activity-feed" style="max-height: 300px; overflow-y: auto;">
+                        <div class="text-center p-4 text-muted">
+                            <i class="fas fa-spinner fa-spin"></i> Loading activities...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="row mt-4">
+        <div class="col-12 text-end">
+            <button class="btn btn-primary btn-lg" id="saveSecuritySettings">
+                <i class="fas fa-save"></i> Save Security Settings
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize toggle switches
+    document.querySelectorAll('.toggle-switch').forEach(toggle => {
+        toggle.addEventListener('click', function() {
+            this.classList.toggle('active');
+            updateSecurityLevel();
+        });
+    });
+
+    // Save settings
+    document.getElementById('saveSecuritySettings').addEventListener('click', function() {
+        saveSecuritySettings();
+    });
+
+    // Load initial data
+    loadSecurityData();
+    
+    // Initialize real-time monitoring
+    initializeRealTimeMonitoring();
+
+    function updateSecurityLevel() {
+        const activeToggles = document.querySelectorAll('.toggle-switch.active').length;
+        const totalToggles = document.querySelectorAll('.toggle-switch').length;
+        const percentage = (activeToggles / totalToggles) * 100;
+
+        const levelElement = document.getElementById('securityLevel');
+        if (percentage >= 80) {
+            levelElement.textContent = 'Security Level: High';
+            levelElement.className = 'security-level security-high';
+        } else if (percentage >= 50) {
+            levelElement.textContent = 'Security Level: Medium';
+            levelElement.className = 'security-level security-medium';
+        } else {
+            levelElement.textContent = 'Security Level: Low';
+            levelElement.className = 'security-level security-low';
+        }
+    }
+
+    async function loadSecurityData() {
+        try {
+            const response = await fetch('/settings/api/security/');
+            const data = await response.json();
+            
+            if (data.success) {
+                // Populate form with current settings
+                Object.entries(data.settings).forEach(([key, value]) => {
+                    const toggle = document.querySelector(`[data-setting="${key}"]`);
+                    if (toggle) {
+                        toggle.classList.toggle('active', value);
+                    }
+                    
+                    const input = document.getElementById(key);
+                    if (input) {
+                        input.value = value;
+                    }
+                });
+                updateSecurityLevel();
+            }
+        } catch (error) {
+            console.error('Error loading security data:', error);
+        }
+    }
+
+    // Real-time monitoring variables
+    let previousMetrics = {};
+    let pollingInterval = null;
+    let isPolling = false;
+    
+    function initializeRealTimeMonitoring() {
+        startPolling();
+    }
+    
+    function updateConnectionStatus(status) {
+        const statusElement = document.getElementById('connectionStatus');
+        const statusMap = {
+            'connected': { text: 'Live', class: 'bg-success' },
+            'connecting': { text: 'Connecting...', class: 'bg-warning' },
+            'disconnected': { text: 'Offline', class: 'bg-danger' }
+        };
+        
+        const config = statusMap[status];
+        statusElement.textContent = config.text;
+        statusElement.className = `badge ${config.class}`;
+    }
+    
+    function updateMetrics(metrics) {
+        // Update metric values with change indicators
+        updateMetricWithChange('activeUsers', metrics.active_users);
+        updateMetricWithChange('failedLogins', metrics.failed_logins);
+        updateMetricWithChange('activeSessions', metrics.active_sessions);
+        updateMetricWithChange('securityAlerts', metrics.security_alerts);
+        
+        // Store current metrics for next comparison
+        previousMetrics = { ...metrics };
+    }
+    
+    function updateMetricWithChange(elementId, newValue) {
+        const element = document.getElementById(elementId);
+        const changeElement = document.getElementById(elementId + 'Change');
+        const oldValue = previousMetrics[elementId.replace(/([A-Z])/g, '_$1').toLowerCase()] || 0;
+        
+        // Add updating animation
+        element.classList.add('updating');
+        setTimeout(() => element.classList.remove('updating'), 1000);
+        
+        // Update value
+        element.textContent = newValue;
+        
+        // Show change indicator
+        if (changeElement && oldValue !== undefined) {
+            const change = newValue - oldValue;
+            if (change > 0) {
+                changeElement.innerHTML = `<i class="fas fa-arrow-up"></i> +${change}`;
+                changeElement.className = 'metric-change metric-up';
+            } else if (change < 0) {
+                changeElement.innerHTML = `<i class="fas fa-arrow-down"></i> ${change}`;
+                changeElement.className = 'metric-change metric-down';
+            } else {
+                changeElement.innerHTML = `<i class="fas fa-minus"></i> No change`;
+                changeElement.className = 'metric-change metric-same';
+            }
+        }
+    }
+    
+    function updateActivityFeed(activities) {
+        const feedElement = document.getElementById('activityFeed');
+        
+        if (!activities || activities.length === 0) {
+            feedElement.innerHTML = '<div class="text-center p-4 text-muted"><i class="fas fa-info-circle"></i> No recent activities</div>';
+            return;
+        }
+        
+        const activityHtml = activities.map((activity, index) => {
+            const timeAgo = getTimeAgo(new Date(activity.timestamp));
+            const actionIcon = getActionIcon(activity.action);
+            const actionColor = getActionColor(activity.action);
+            const isNew = index < 3; // Mark first 3 as potentially new
+            
+            return `
+                <div class="activity-item ${isNew ? 'activity-new' : ''}">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <i class="fas fa-${actionIcon} ${actionColor}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">${activity.user__username || 'System'}</div>
+                            <div class="small text-muted">${formatAction(activity.action)}</div>
+                            <div class="small text-muted">
+                                <i class="fas fa-globe-americas me-1"></i>${activity.ip_address} • 
+                                <i class="fas fa-clock me-1"></i>${timeAgo}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        feedElement.innerHTML = activityHtml;
+        
+        // Remove new class after animation
+        setTimeout(() => {
+            document.querySelectorAll('.activity-new').forEach(el => {
+                el.classList.remove('activity-new');
+            });
+        }, 1000);
+    }
+    
+    function getActionIcon(action) {
+        const iconMap = {
+            'login': 'sign-in-alt',
+            'logout': 'sign-out-alt',
+            'failed_login': 'exclamation-triangle',
+            'password_change': 'key',
+            'account_locked': 'lock',
+            'profile_updated': 'user-edit'
+        };
+        return iconMap[action] || 'info-circle';
+    }
+    
+    function getActionColor(action) {
+        const colorMap = {
+            'login': 'text-success',
+            'logout': 'text-info',
+            'failed_login': 'text-danger',
+            'password_change': 'text-warning',
+            'account_locked': 'text-danger',
+            'profile_updated': 'text-primary'
+        };
+        return colorMap[action] || 'text-muted';
+    }
+    
+    function formatAction(action) {
+        const actionMap = {
+            'login': 'Logged in',
+            'logout': 'Logged out',
+            'failed_login': 'Failed login attempt',
+            'password_change': 'Changed password',
+            'account_locked': 'Account locked',
+            'profile_updated': 'Updated profile'
+        };
+        return actionMap[action] || action.replace('_', ' ');
+    }
+    
+    function getTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+        
+        const diffDays = Math.floor(diffHours / 24);
+        return `${diffDays}d ago`;
+    }
+    
+    function updateLastUpdateTime() {
+        const now = new Date();
+        document.getElementById('lastUpdate').textContent = `Updated ${now.toLocaleTimeString()}`;
+    }
+    
+    function startPolling() {
+        if (isPolling) return;
+        
+        console.log('🔄 Starting real-time polling');
+        isPolling = true;
+        updateConnectionStatus('connecting');
+        
+        // Initial load
+        loadMetricsAndActivities();
+        
+        // Set up polling interval
+        pollingInterval = setInterval(loadMetricsAndActivities, 15000); // 15 seconds
+    }
+    
+    function stopPolling() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+        isPolling = false;
+        updateConnectionStatus('disconnected');
+    }
+    
+    async function loadMetricsAndActivities() {
+        try {
+            // Load metrics and activities in parallel
+            const [metricsResponse, activitiesResponse] = await Promise.all([
+                fetch('/settings/api/security/metrics/'),
+                fetch('/settings/api/security/activities/')
+            ]);
+            
+            const [metricsData, activitiesData] = await Promise.all([
+                metricsResponse.json(),
+                activitiesResponse.json()
+            ]);
+            
+            if (metricsData.success) {
+                updateMetrics(metricsData.metrics);
+                updateConnectionStatus('connected');
+            }
+            
+            if (activitiesData.success) {
+                updateActivityFeed(activitiesData.activities);
+            }
+            
+            updateLastUpdateTime();
+            
+        } catch (error) {
+            console.error('Polling error:', error);
+            updateConnectionStatus('disconnected');
+        }
+    }
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        stopPolling();
+    });
+    
+    // Pause polling when page is hidden
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopPolling();
+        } else {
+            startPolling();
+        }
+    });
+
+    async function saveSecuritySettings() {
+        const button = document.getElementById('saveSecuritySettings');
+        const originalText = button.innerHTML;
+        
+        try {
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+            const settings = {};
+            
+            // Collect toggle settings
+            document.querySelectorAll('.toggle-switch').forEach(toggle => {
+                const setting = toggle.dataset.setting;
+                settings[setting] = toggle.classList.contains('active');
+            });
+
+            // Collect other settings
+            settings.sessionTimeout = document.getElementById('sessionTimeout').value;
+            settings.maxLoginAttempts = document.getElementById('maxLoginAttempts').value;
+            settings.dataRetention = document.getElementById('dataRetention').value;
+
+            const formData = new FormData();
+            formData.append('settings', JSON.stringify(settings));
+            formData.append('csrfmiddlewaretoken', getCSRFToken());
+
+            const response = await fetch('/settings/api/security/update/', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showAlert('Security settings saved successfully!', 'success');
+            } else {
+                showAlert(data.error || 'Failed to save settings', 'danger');
+            }
+
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            showAlert('Network error occurred', 'danger');
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    }
+
+    function getCSRFToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') {
+                return value;
+            }
+        }
+        return '';
+    }
+
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+});
+</script>
+{% endblock %}

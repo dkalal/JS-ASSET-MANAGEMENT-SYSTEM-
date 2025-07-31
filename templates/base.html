@@ -4,130 +4,247 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Asset Management System{% endblock %}</title>
+    <title>{% block title %}Enterprise Asset Management{% endblock %}</title>
     <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' https://cdn.jsdelivr.net;">
-    <!-- Only use Bootstrap CDN for CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    {# TODO: Move inline CSS to static/css/base.css for better maintainability and caching #}
+    <meta name="description" content="Professional enterprise asset management system">
+    <meta name="theme-color" content="#1e40af">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{% static 'css/enterprise.css' %}" rel="stylesheet">
+    <link href="{% static 'css/enterprise-tables.css' %}" rel="stylesheet">
+    <link href="{% static 'css/global-override.css' %}" rel="stylesheet">
+    <link href="{% static 'css/theme-system.css' %}" rel="stylesheet">
     <style>
-        :root {
-            --primary: #00A6EB;
-            --secondary: #7ED6F6;
-            --accent: #176B87;
-            --background: #B4E9FC;
-            --dark: #04364A;
-        }
+        /* Theme variables will be loaded from theme-system.css */
+        
+        * { box-sizing: border-box; }
+        
         body {
-            background: var(--background);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--theme-bg-gradient) !important;
+            color: var(--theme-text-primary);
+            line-height: 1.6;
             min-height: 100vh;
-            font-family: 'Segoe UI', Arial, sans-serif;
+            transition: var(--theme-transition);
         }
+        
+        /* Ensure consistent background across all pages */
+        body.authenticated,
+        body[class*="dashboard"],
+        body[class*="page"] {
+            background: var(--theme-bg-gradient) !important;
+        }
+        
+        .enterprise-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1rem;
+            background: transparent;
+            color: var(--theme-text-primary);
+        }
+        
+        @media (max-width: 640px) {
+            .enterprise-container { padding: 0 0.75rem; }
+            .main-content { padding: 1rem; }
+            .card-body { padding: 1rem; }
+        }
+        
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .main-content { padding: 1.5rem; }
+        }
+        
         .glass {
-            background: rgba(255,255,255,0.25);
-            box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.18);
+            background: var(--theme-glass-bg) !important;
+            backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid var(--theme-glass-border) !important;
+            border-radius: 12px;
+            box-shadow: var(--theme-shadow) !important;
+            transition: var(--theme-transition);
+            color: var(--theme-text-primary) !important;
         }
-        .navbar {
-            background: var(--primary);
+        
+        .enterprise-navbar {
+            z-index: 2000;
+            background: var(--theme-navbar-bg);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--theme-border-primary);
+            box-shadow: var(--theme-shadow);
+            padding: 0.75rem 0;
+            transition: var(--theme-transition);
         }
-        .navbar-brand img {
-            height: 40px;
+        
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary-700) !important;
+            font-size: 1.25rem;
         }
+        
         .btn-primary {
-            background: var(--primary);
+            background: var(--primary-600);
             border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
         }
+        
         .btn-primary:hover {
-            background: var(--accent);
+            background: var(--primary-700);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
-    </style>
-    {% block extra_head %}{% endblock %}
-    {% block extra_styles %}{% endblock %}
-    <style>
-    /* Unified Glassmorphism Modal Styles for All Modals */
+        
+        .content-wrapper {
+            padding: 1.5rem 0;
+        }
+        
+        .main-content {
+            padding: 2rem;
+            background: var(--theme-bg-primary) !important;
+            color: var(--theme-text-primary) !important;
+            transition: var(--theme-transition);
+        }
+        
+        /* Mobile Navigation */
+        .mobile-toggle {
+            display: none;
+        }
+        
+        @media (max-width: 1023px) {
+            .mobile-toggle {
+                display: inline-flex;
+            }
+            
+            .topbar-actions {
+                display: none;
+            }
+            
+            .topbar-actions.show {
+                display: flex;
+                position: absolute;
+                top: 100%;
+                right: 0;
+                background: white;
+                border: 1px solid var(--neutral-200);
+                border-radius: var(--radius);
+                box-shadow: var(--shadow-lg);
+                padding: 1rem;
+                flex-direction: column;
+                gap: 0.5rem;
+                min-width: 200px;
+            }
+        }
+
+        /* Typography Scale */
+        h1 { font-size: 2.25rem; font-weight: 700; }
+        h2 { font-size: 1.75rem; font-weight: 600; }
+        h3 { font-size: 1.5rem; font-weight: 600; }
+        .card-title { font-size: 1.125rem; }
+
+        /* Unified Glass Card */
+        .enterprise-card {
+        background: var(--surface);
+        backdrop-filter: blur(16px);
+        border-radius: var(--border-radius-lg);
+        border: var(--border);
+        box-shadow: var(--elevation-1);
+        transition: var(--transition-default);
+        padding: var(--spacing-lg);
+        }
+        .enterprise-card:hover {
+        box-shadow: var(--elevation-2);
+        transform: translateY(-2px);
+        }
+
+            /* Enterprise Modal System */
     .custom-modal-overlay {
       display: none;
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(23, 107, 135, 0.18);
-      z-index: 2000;
+      background: rgba(0, 0, 0, 0.5);
+      
       justify-content: center;
       align-items: center;
-      backdrop-filter: blur(6px) saturate(160%);
+      backdrop-filter: blur(4px);
     }
     .custom-modal-overlay.active {
       display: flex;
     }
     .glass-modal {
-      background: rgba(255,255,255,0.28);
-      border-radius: 18px;
+      background: white;
+      border-radius: 12px;
       max-width: 500px;
-      width: 100%;
-      box-shadow: 0 12px 48px 0 rgba(23,107,135,0.18), 0 2px 8px 0 rgba(0,166,235,0.10);
-      padding: 0;
+      width: 90%;
+      box-shadow: var(--shadow-lg);
       overflow: hidden;
-      border: 1.5px solid rgba(23,107,135,0.10);
-      backdrop-filter: blur(12px) saturate(180%);
-      -webkit-backdrop-filter: blur(12px) saturate(180%);
-      transition: box-shadow 0.2s;
+      border: 1px solid var(--neutral-200);
     }
     .custom-modal-header {
-      background: linear-gradient(90deg, #00A6EB 0%, #176B87 100%);
-      color: #fff;
-      padding: 1.2rem 2rem 1.2rem 1.5rem;
-      border-bottom: none;
-      border-radius: 18px 18px 0 0;
-      box-shadow: 0 2px 8px 0 rgba(23,107,135,0.10);
+      background: var(--primary-600);
+      color: white;
+      padding: 1rem 1.5rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     .custom-modal-header .modal-title {
-      font-size: 1.35rem;
-      letter-spacing: 0.01em;
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin: 0;
     }
     .custom-modal-close {
       background: none;
       border: none;
-      font-size: 2.1rem;
-      color: #fff;
+      color: white;
+      font-size: 1.5rem;
       cursor: pointer;
-      line-height: 1;
-      opacity: 0.85;
-      transition: opacity 0.18s;
+      padding: 0.25rem;
+      border-radius: 4px;
+      transition: background-color 0.2s;
     }
-    .custom-modal-close:hover, .custom-modal-close:focus {
-      opacity: 1;
-      color: #FFD700;
+    .custom-modal-close:hover {
+      background: rgba(255, 255, 255, 0.1);
     }
     .custom-modal-body {
-      padding: 2rem 1.5rem 1.2rem 1.5rem;
+      padding: 1.5rem;
     }
     .custom-modal-footer {
-      background: transparent;
-      border-top: none;
-    }
-    @media (max-width: 600px) {
-      .glass-modal { max-width: 98vw; border-radius: 10px; }
-      .custom-modal-header, .custom-modal-body { padding-left: 1rem; padding-right: 1rem; }
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--neutral-200);
+      background: var(--neutral-50);
     }
     </style>
+
+    <!-- Add to base.html head -->
+    
+    <!-- Theme Manager - Load Early -->
+    <script src="{% static 'js/theme-manager.js' %}"></script>
+    
+    {% block extra_head %}{% endblock %}
+    {% block extra_styles %}{% endblock %}
+    
 </head>
-<body>
-{% if user.is_authenticated %}
+<body{% if user.is_authenticated %} class="authenticated"{% endif %}>
+{% if user.is_authenticated and request.resolver_match.url_name != 'login' %}
+    <div data-user-role="{{ user.role }}" style="display: none;"></div>
     {% include 'components/auth_navbar.html' %}
 {% endif %}
-<div class="container py-4">
-    <div class="glass p-4">
-        {% block content %}{% endblock %}
+<div class="content-wrapper">
+    <div class="enterprise-container">
+        <div class="glass">
+            <div class="main-content">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
     </div>
 </div>
-<!-- Only use Bootstrap CDN for JS, at the end of body -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'js/enterprise.js' %}"></script>
+<script src="{% static 'js/enterprise-tables.js' %}"></script>
+<script src="{% static 'js/table-enhancer.js' %}"></script>
+{% if user.is_authenticated %}
+<script src="{% static 'js/enterprise-auth.js' %}"></script>
+<script src="{% static 'js/session-manager.js' %}"></script>
+{% endif %}
 {% block extra_scripts %}{% endblock %}
 </body>
 </html> 
